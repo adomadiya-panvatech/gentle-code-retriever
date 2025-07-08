@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -6,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
-import { Upload, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
+import { Upload } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { communityGroupService } from '../services/communityGroupService';
 import { useToast } from '../hooks/use-toast';
@@ -28,22 +28,54 @@ const CommunityGroups = () => {
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
-  useEffect(() => {
-    fetchGroups();
-  }, [currentPage, token]);
+  // Mock data for demonstration
+  const mockGroups = [
+    { id: 1, name: 'Kelley Marie Wellness', image: '/placeholder-image.jpg', lastUpdated: 'Nov 18, 2022 3:01 AM', created: 'Nov 18, 2022 3:01 AM' },
+    { id: 2, name: 'Career-Focused Women', image: '/lovable-uploads/50965e3a-b9ef-4d7c-a90e-53cbd6a5a519.png', lastUpdated: 'Nov 4, 2022 12:30 AM', created: '' },
+    { id: 3, name: 'Burned Out Mamas', image: '/lovable-uploads/ff5af5ed-03b1-4a14-8fbc-397ea41a6aef.png', lastUpdated: 'Nov 4, 2022 12:30 AM', created: '' },
+    { id: 4, name: 'WD-40 Healthy Habits Challenge', image: '/lovable-uploads/7565766c-680c-4874-98d2-9ff6a0973755.png', lastUpdated: 'Oct 31, 2022 9:07 PM', created: 'Oct 31, 2022 9:07 PM' },
+    { id: 5, name: 'WD-40 Fortress of Health Group', image: '/lovable-uploads/0a9970f8-7a6a-4867-944a-b714c26347f8.png', lastUpdated: 'Oct 19, 2022 9:34 PM', created: 'Oct 19, 2022 9:32 PM' },
+    { id: 6, name: 'Sleep Seekers', image: '/placeholder-image.jpg', lastUpdated: 'Jul 6, 2022 1:31 AM', created: '' },
+    { id: 7, name: 'Aspiring Healthy Eaters', image: '/placeholder-image.jpg', lastUpdated: 'Jul 6, 2022 1:31 AM', created: '' },
+    { id: 8, name: 'Mindful Meditation Circle', image: '/placeholder-image.jpg', lastUpdated: 'Jun 15, 2022 2:15 PM', created: 'Jun 15, 2022 2:15 PM' },
+    { id: 9, name: 'Fitness Enthusiasts', image: '/placeholder-image.jpg', lastUpdated: 'Jun 10, 2022 11:30 AM', created: 'Jun 10, 2022 11:30 AM' },
+    { id: 10, name: 'Creative Writers Hub', image: '/placeholder-image.jpg', lastUpdated: 'May 28, 2022 4:20 PM', created: 'May 28, 2022 4:20 PM' },
+    { id: 11, name: 'Tech Professionals Network', image: '/placeholder-image.jpg', lastUpdated: 'May 20, 2022 9:45 AM', created: 'May 20, 2022 9:45 AM' },
+    { id: 12, name: 'Young Entrepreneurs', image: '/placeholder-image.jpg', lastUpdated: 'May 15, 2022 6:30 PM', created: 'May 15, 2022 6:30 PM' }
+  ];
 
-  const fetchGroups = async () => {
-    if (!token) return;
+  const fetchGroups = async (page = 1) => {
+    if (!token) {
+      // Use mock data when no token
+      const totalItems = mockGroups.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = mockGroups.slice(startIndex, endIndex);
+      
+      setGroups(paginatedData);
+      setTotalPages(Math.ceil(totalItems / itemsPerPage));
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await communityGroupService.getCommunityGroups(token, currentPage, itemsPerPage);
+      const response = await communityGroupService.getCommunityGroups(token, page, itemsPerPage);
       setGroups(response.data || response);
       setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
     } catch (error) {
       console.error('Error fetching community groups:', error);
+      // Fallback to mock data
+      const totalItems = mockGroups.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = mockGroups.slice(startIndex, endIndex);
+      
+      setGroups(paginatedData);
+      setTotalPages(Math.ceil(totalItems / itemsPerPage));
+      
       toast({
         title: "Error",
-        description: "Failed to load community groups",
+        description: "Failed to load community groups, showing sample data",
         variant: "destructive",
       });
     } finally {
@@ -51,57 +83,9 @@ const CommunityGroups = () => {
     }
   };
 
-  const mockGroups = [
-    { 
-      id: 1, 
-      name: 'Kelley Marie Wellness', 
-      image: '/placeholder-image.jpg',
-      lastUpdated: 'Nov 18, 2022 3:01 AM',
-      created: 'Nov 18, 2022 3:01 AM'
-    },
-    { 
-      id: 2, 
-      name: 'Career-Focused Women', 
-      image: '/lovable-uploads/50965e3a-b9ef-4d7c-a90e-53cbd6a5a519.png',
-      lastUpdated: 'Nov 4, 2022 12:30 AM',
-      created: ''
-    },
-    { 
-      id: 3, 
-      name: 'Burned Out Mamas', 
-      image: '/lovable-uploads/ff5af5ed-03b1-4a14-8fbc-397ea41a6aef.png',
-      lastUpdated: 'Nov 4, 2022 12:30 AM',
-      created: ''
-    },
-    { 
-      id: 4, 
-      name: 'WD-40 Healthy Habits Challenge', 
-      image: '/lovable-uploads/7565766c-680c-4874-98d2-9ff6a0973755.png',
-      lastUpdated: 'Oct 31, 2022 9:07 PM',
-      created: 'Oct 31, 2022 9:07 PM'
-    },
-    { 
-      id: 5, 
-      name: 'WD-40 Fortress of Health Group', 
-      image: '/lovable-uploads/0a9970f8-7a6a-4867-944a-b714c26347f8.png',
-      lastUpdated: 'Oct 19, 2022 9:34 PM',
-      created: 'Oct 19, 2022 9:32 PM'
-    },
-    { 
-      id: 6, 
-      name: 'Sleep Seekers', 
-      image: '/placeholder-image.jpg',
-      lastUpdated: 'Jul 6, 2022 1:31 AM',
-      created: ''
-    },
-    { 
-      id: 7, 
-      name: 'Aspiring Healthy Eaters', 
-      image: '/placeholder-image.jpg',
-      lastUpdated: 'Jul 6, 2022 1:31 AM',
-      created: ''
-    }
-  ];
+  useEffect(() => {
+    fetchGroups(currentPage);
+  }, [currentPage, token]);
 
   const handleAddGroup = () => {
     setFormData({
@@ -117,6 +101,10 @@ const CommunityGroups = () => {
   const handleSave = () => {
     console.log('Saving community group:', formData);
     setIsFormOpen(false);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   return (
@@ -149,51 +137,70 @@ const CommunityGroups = () => {
                     Loading community groups...
                   </TableCell>
                 </TableRow>
-              ) : (groups.length > 0 ? groups : mockGroups).map((group) => (
-                <TableRow key={group.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <TableCell>
-                    <img 
-                      src={group.image} 
-                      alt={group.name}
-                      className="w-12 h-12 object-cover rounded"
-                    />
+              ) : groups.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="p-8 text-center text-gray-500">
+                    No community groups found
                   </TableCell>
-                  <TableCell className="text-blue-600 hover:underline cursor-pointer">
-                    {group.name}
-                  </TableCell>
-                  <TableCell>{group.lastUpdated}</TableCell>
-                  <TableCell>{group.created}</TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                groups.map((group) => (
+                  <TableRow key={group.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <TableCell>
+                      <img 
+                        src={group.image} 
+                        alt={group.name}
+                        className="w-12 h-12 object-cover rounded"
+                      />
+                    </TableCell>
+                    <TableCell className="text-blue-600 hover:underline cursor-pointer">
+                      {group.name}
+                    </TableCell>
+                    <TableCell>{group.lastUpdated}</TableCell>
+                    <TableCell>{group.created}</TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                    const page = i + 1;
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => handlePageChange(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-4">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Previous
-          </Button>
-          <span className="text-sm text-gray-600">
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-      )}
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-2xl">

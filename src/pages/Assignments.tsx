@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Checkbox } from '../components/ui/checkbox';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
 import { useAuth } from '../context/AuthContext';
 import { assignmentService } from '../services/assignmentService';
 import { useToast } from '../hooks/use-toast';
@@ -20,22 +19,57 @@ const Assignments = () => {
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
-  useEffect(() => {
-    fetchAssignments();
-  }, [currentPage, token]);
+  // Mock data for demonstration
+  const mockAssignments = [
+    { user: 'carriebartell@roob.name', type: 'content', scheduled: 'Nov 15, 2022 9:15:00 PM', expiry: 'Nov 16, 2022 12:20:00 AM' },
+    { user: 'robinnolan@funk.name', type: 'content', scheduled: 'Nov 15, 2022 6:45:00 PM', expiry: 'Nov 16, 2022 12:50:00 AM' },
+    { user: 'robinnolan@funk.name', type: 'content', scheduled: 'Nov 14, 2022 5:35:00 PM', expiry: 'Nov 15, 2022 12:40:00 AM' },
+    { user: 'tamerarogahn@bednar.com', type: 'content', scheduled: 'Nov 14, 2022 4:00:00 PM', expiry: 'Nov 14, 2022 8:05:00 PM' },
+    { user: 'robinnolan@funk.name', type: 'content', scheduled: 'Nov 12, 2022 10:45:00 PM', expiry: 'Nov 14, 2022 5:50:00 PM' },
+    { user: 'candidakoepp@kirlin.info', type: 'content', scheduled: 'Nov 11, 2022 10:00:00 PM', expiry: 'Nov 14, 2022 5:00:00 PM' },
+    { user: 'robinnolan@funk.name', type: 'content', scheduled: 'Nov 11, 2022 9:25:00 PM', expiry: 'Nov 11, 2022 9:30:00 PM' },
+    { user: 'robinnolan@funk.name', type: 'content', scheduled: 'Nov 11, 2022 9:00:00 PM', expiry: 'Nov 11, 2022 9:05:00 PM' },
+    { user: 'robinnolan@funk.name', type: 'content', scheduled: 'Nov 11, 2022 7:15:00 PM', expiry: 'Nov 11, 2022 7:20:00 PM' },
+    { user: 'johndoe@example.com', type: 'survey', scheduled: 'Nov 10, 2022 8:00:00 PM', expiry: 'Nov 12, 2022 8:00:00 PM' },
+    { user: 'janedoe@example.com', type: 'challenge', scheduled: 'Nov 9, 2022 7:30:00 PM', expiry: 'Nov 16, 2022 7:30:00 PM' },
+    { user: 'mikejohnson@example.com', type: 'content', scheduled: 'Nov 8, 2022 6:00:00 PM', expiry: 'Nov 10, 2022 6:00:00 PM' },
+    { user: 'sarahsmith@example.com', type: 'tip', scheduled: 'Nov 7, 2022 5:15:00 PM', expiry: 'Nov 8, 2022 5:15:00 PM' },
+    { user: 'davidwilson@example.com', type: 'content', scheduled: 'Nov 6, 2022 4:45:00 PM', expiry: 'Nov 9, 2022 4:45:00 PM' },
+    { user: 'emilywhite@example.com', type: 'goal', scheduled: 'Nov 5, 2022 3:20:00 PM', expiry: 'Nov 12, 2022 3:20:00 PM' }
+  ];
 
-  const fetchAssignments = async () => {
-    if (!token) return;
+  const fetchAssignments = async (page = 1) => {
+    if (!token) {
+      // Use mock data when no token
+      const totalItems = mockAssignments.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = mockAssignments.slice(startIndex, endIndex);
+      
+      setAssignments(paginatedData);
+      setTotalPages(Math.ceil(totalItems / itemsPerPage));
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await assignmentService.getAssignments(token, currentPage, itemsPerPage);
+      const response = await assignmentService.getAssignments(token, page, itemsPerPage);
       setAssignments(response.data || response);
       setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
     } catch (error) {
       console.error('Error fetching assignments:', error);
+      // Fallback to mock data
+      const totalItems = mockAssignments.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = mockAssignments.slice(startIndex, endIndex);
+      
+      setAssignments(paginatedData);
+      setTotalPages(Math.ceil(totalItems / itemsPerPage));
+      
       toast({
         title: "Error",
-        description: "Failed to load assignments",
+        description: "Failed to load assignments, showing sample data",
         variant: "destructive",
       });
     } finally {
@@ -43,67 +77,18 @@ const Assignments = () => {
     }
   };
 
-  const mockAssignments = [
-    { 
-      user: 'carriebartell@roob.name', 
-      type: 'content', 
-      scheduled: 'Nov 15, 2022 9:15:00 PM', 
-      expiry: 'Nov 16, 2022 12:20:00 AM' 
-    },
-    { 
-      user: 'robinnolan@funk.name', 
-      type: 'content', 
-      scheduled: 'Nov 15, 2022 6:45:00 PM', 
-      expiry: 'Nov 16, 2022 12:50:00 AM' 
-    },
-    { 
-      user: 'robinnolan@funk.name', 
-      type: 'content', 
-      scheduled: 'Nov 14, 2022 5:35:00 PM', 
-      expiry: 'Nov 15, 2022 12:40:00 AM' 
-    },
-    { 
-      user: 'tamerarogahn@bednar.com', 
-      type: 'content', 
-      scheduled: 'Nov 14, 2022 4:00:00 PM', 
-      expiry: 'Nov 14, 2022 8:05:00 PM' 
-    },
-    { 
-      user: 'robinnolan@funk.name', 
-      type: 'content', 
-      scheduled: 'Nov 12, 2022 10:45:00 PM', 
-      expiry: 'Nov 14, 2022 5:50:00 PM' 
-    },
-    { 
-      user: 'candidakoepp@kirlin.info', 
-      type: 'content', 
-      scheduled: 'Nov 11, 2022 10:00:00 PM', 
-      expiry: 'Nov 14, 2022 5:00:00 PM' 
-    },
-    { 
-      user: 'robinnolan@funk.name', 
-      type: 'content', 
-      scheduled: 'Nov 11, 2022 9:25:00 PM', 
-      expiry: 'Nov 11, 2022 9:30:00 PM' 
-    },
-    { 
-      user: 'robinnolan@funk.name', 
-      type: 'content', 
-      scheduled: 'Nov 11, 2022 9:00:00 PM', 
-      expiry: 'Nov 11, 2022 9:05:00 PM' 
-    },
-    { 
-      user: 'robinnolan@funk.name', 
-      type: 'content', 
-      scheduled: 'Nov 11, 2022 7:15:00 PM', 
-      expiry: 'Nov 11, 2022 7:20:00 PM' 
-    }
-  ];
+  useEffect(() => {
+    fetchAssignments(currentPage);
+  }, [currentPage, token]);
 
   const handleCheckboxChange = (checked: boolean | "indeterminate") => {
     if (typeof checked === 'boolean') {
       setShowCardPreviews(checked);
     }
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   return (
@@ -154,22 +139,66 @@ const Assignments = () => {
                         Loading assignments...
                       </TableCell>
                     </TableRow>
-                  ) : (assignments.length > 0 ? assignments : mockAssignments).map((assignment, index) => (
-                    <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                      <TableCell className="text-blue-600">{assignment.user}</TableCell>
-                      <TableCell>{assignment.type}</TableCell>
-                      <TableCell>{assignment.scheduled}</TableCell>
-                      <TableCell>{assignment.expiry}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <button className="text-blue-600 hover:underline text-sm">View</button>
-                          <button className="text-blue-600 hover:underline text-sm">Edit</button>
-                        </div>
+                  ) : assignments.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="p-8 text-center text-gray-500">
+                        No assignments found
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    assignments.map((assignment, index) => (
+                      <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                        <TableCell className="text-blue-600">{assignment.user}</TableCell>
+                        <TableCell>{assignment.type}</TableCell>
+                        <TableCell>{assignment.scheduled}</TableCell>
+                        <TableCell>{assignment.expiry}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <button className="text-blue-600 hover:underline text-sm">View</button>
+                            <button className="text-blue-600 hover:underline text-sm">Edit</button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="p-4 border-t">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                          className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                        const page = i + 1;
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(page)}
+                              isActive={currentPage === page}
+                              className="cursor-pointer"
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      })}
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                          className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -214,31 +243,6 @@ const Assignments = () => {
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-4 mt-6">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Previous
-          </Button>
-          <span className="text-sm text-gray-600">
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 };

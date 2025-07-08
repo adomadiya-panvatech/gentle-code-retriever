@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -7,7 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
-import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
+import { Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { companyService } from '../services/companyService';
 import { useToast } from '../hooks/use-toast';
@@ -25,29 +25,7 @@ const Companies = () => {
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
-  useEffect(() => {
-    fetchCompanies();
-  }, [currentPage, token]);
-
-  const fetchCompanies = async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const response = await companyService.getCompanies(token);
-      setCompanies(response.data || response);
-      setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
-    } catch (error) {
-      console.error('Error fetching companies:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load companies",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Mock data for demonstration
   const mockCompanies = [
     { name: 'A/B Test: Dynamic Home onboarding', created: '2021/05/20' },
     { name: 'A/B Test: In context onboarding', created: '2021/05/19' },
@@ -66,8 +44,53 @@ const Companies = () => {
     { name: 'Inmarsat', created: '2019/05/29' },
     { name: 'Continuum Global Solutions', created: '2019/05/23' },
     { name: 'Ian Martin', created: '2019/05/17' },
-    { name: 'Lloyd Pest Control', created: '2019/05/10' }
+    { name: 'Lloyd Pest Control', created: '2019/05/10' },
+    { name: 'TechCorp Industries', created: '2019/04/25' },
+    { name: 'Global Wellness Inc', created: '2019/04/15' }
   ];
+
+  const fetchCompanies = async (page = 1) => {
+    if (!token) {
+      // Use mock data when no token
+      const totalItems = mockCompanies.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = mockCompanies.slice(startIndex, endIndex);
+      
+      setCompanies(paginatedData);
+      setTotalPages(Math.ceil(totalItems / itemsPerPage));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await companyService.getCompanies(token);
+      setCompanies(response.data || response);
+      setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+      // Fallback to mock data
+      const totalItems = mockCompanies.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = mockCompanies.slice(startIndex, endIndex);
+      
+      setCompanies(paginatedData);
+      setTotalPages(Math.ceil(totalItems / itemsPerPage));
+      
+      toast({
+        title: "Error",
+        description: "Failed to load companies, showing sample data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCompanies(currentPage);
+  }, [currentPage, token]);
 
   const handleCreateCompany = () => {
     console.log('Creating company:', { companyName, companyCode, statsReport });
@@ -81,6 +104,10 @@ const Companies = () => {
     if (typeof checked === 'boolean') {
       setStatsReport(checked);
     }
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   return (
@@ -112,41 +139,60 @@ const Companies = () => {
                     Loading companies...
                   </TableCell>
                 </TableRow>
-              ) : (companies.length > 0 ? companies : mockCompanies).map((company, index) => (
-                <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                  <TableCell className="font-medium">{company.name}</TableCell>
-                  <TableCell className="text-gray-600">{company.created}</TableCell>
+              ) : companies.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={2} className="p-8 text-center text-gray-500">
+                    No companies found
+                  </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                companies.map((company, index) => (
+                  <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                    <TableCell className="font-medium">{company.name}</TableCell>
+                    <TableCell className="text-gray-600">{company.created}</TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                    const page = i + 1;
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => handlePageChange(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-4">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Previous
-          </Button>
-          <span className="text-sm text-gray-600">
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-      )}
 
       <Dialog open={showNewCompanyDialog} onOpenChange={setShowNewCompanyDialog}>
         <DialogContent className="sm:max-w-[500px]">

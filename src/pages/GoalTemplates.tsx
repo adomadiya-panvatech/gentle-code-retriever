@@ -27,8 +27,39 @@ const GoalTemplates = () => {
   const { toast } = useToast();
   const token = localStorage.getItem('token');
 
+  // Mock data for demonstration
+  const mockTemplates = [
+    { id: 1, name: '30-Day Fitness Challenge', title: '30-Day Fitness Challenge', activities: 15, taxonomies: 3, image: null },
+    { id: 2, name: 'Mindfulness Journey', title: 'Mindfulness Journey', activities: 21, taxonomies: 2, image: null },
+    { id: 3, name: 'Healthy Eating Habits', title: 'Healthy Eating Habits', activities: 12, taxonomies: 4, image: null },
+    { id: 4, name: 'Sleep Optimization', title: 'Sleep Optimization', activities: 8, taxonomies: 2, image: null },
+    { id: 5, name: 'Stress Reduction Program', title: 'Stress Reduction Program', activities: 18, taxonomies: 3, image: null },
+    { id: 6, name: 'Work-Life Balance', title: 'Work-Life Balance', activities: 10, taxonomies: 2, image: null },
+    { id: 7, name: 'Creative Expression', title: 'Creative Expression', activities: 14, taxonomies: 1, image: null },
+    { id: 8, name: 'Social Connection', title: 'Social Connection', activities: 9, taxonomies: 2, image: null },
+    { id: 9, name: 'Personal Growth', title: 'Personal Growth', activities: 20, taxonomies: 5, image: null },
+    { id: 10, name: 'Financial Wellness', title: 'Financial Wellness', activities: 7, taxonomies: 1, image: null },
+    { id: 11, name: 'Career Development', title: 'Career Development', activities: 16, taxonomies: 3, image: null },
+    { id: 12, name: 'Time Management', title: 'Time Management', activities: 11, taxonomies: 2, image: null }
+  ];
+
   const fetchTemplates = async (page = 1) => {
-    if (!token) return;
+    if (!token) {
+      // Use mock data when no token
+      const filtered = mockTemplates.filter(template =>
+        template.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        template.title?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      const totalItems = filtered.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = filtered.slice(startIndex, endIndex);
+      
+      setTemplates(paginatedData);
+      setTotalPages(Math.ceil(totalItems / itemsPerPage));
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await goalTemplateService.getGoalTemplates(token, page, itemsPerPage);
@@ -37,9 +68,22 @@ const GoalTemplates = () => {
       setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
     } catch (error) {
       console.error('Error fetching goal templates:', error);
+      // Fallback to mock data
+      const filtered = mockTemplates.filter(template =>
+        template.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        template.title?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      const totalItems = filtered.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = filtered.slice(startIndex, endIndex);
+      
+      setTemplates(paginatedData);
+      setTotalPages(Math.ceil(totalItems / itemsPerPage));
+      
       toast({
         title: "Error",
-        description: "Failed to fetch goal templates",
+        description: "Failed to fetch goal templates, showing sample data",
         variant: "destructive",
       });
     } finally {
@@ -49,7 +93,7 @@ const GoalTemplates = () => {
 
   useEffect(() => {
     fetchTemplates(currentPage);
-  }, [currentPage, token]);
+  }, [currentPage, searchTerm, token]);
 
   const handleEdit = (template: any) => {
     console.log('Editing template:', template);
@@ -72,10 +116,10 @@ const GoalTemplates = () => {
     setCurrentPage(page);
   };
 
-  const filteredTemplates = templates.filter(template =>
-    template.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    template.title?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
 
   return (
     <div className="space-y-6">
@@ -99,7 +143,7 @@ const GoalTemplates = () => {
             placeholder="Search templates..."
             className="pl-10"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={handleSearchChange}
           />
         </div>
       </div>
@@ -144,14 +188,14 @@ const GoalTemplates = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredTemplates.length === 0 ? (
+                      {templates.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={5} className="text-center py-12 text-gray-500">
-                            No goal templates found. Click "Add Goal Template" to create your first template.
+                            {searchTerm ? `No templates found matching "${searchTerm}"` : 'No goal templates found. Click "Add Goal Template" to create your first template.'}
                           </TableCell>
                         </TableRow>
                       ) : (
-                        filteredTemplates.map((template) => (
+                        templates.map((template) => (
                           <TableRow key={template.id} className="border-b border-gray-100 hover:bg-gray-50">
                             <TableCell>
                               {template.image && (

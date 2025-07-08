@@ -21,8 +21,38 @@ const Taxonomy = () => {
   const { toast } = useToast();
   const token = localStorage.getItem('token');
 
+  // Mock data for demonstration
+  const mockTaxonomies = [
+    { id: 1, name: 'Wellness', description: 'Health and wellness content', created_at: '2023-01-15' },
+    { id: 2, name: 'Fitness', description: 'Physical fitness activities', created_at: '2023-01-20' },
+    { id: 3, name: 'Nutrition', description: 'Diet and nutrition guidance', created_at: '2023-02-01' },
+    { id: 4, name: 'Mental Health', description: 'Mental wellness resources', created_at: '2023-02-10' },
+    { id: 5, name: 'Sleep', description: 'Sleep improvement content', created_at: '2023-02-15' },
+    { id: 6, name: 'Stress Management', description: 'Stress reduction techniques', created_at: '2023-03-01' },
+    { id: 7, name: 'Work-Life Balance', description: 'Professional and personal balance', created_at: '2023-03-10' },
+    { id: 8, name: 'Meditation', description: 'Mindfulness and meditation', created_at: '2023-03-15' },
+    { id: 9, name: 'Exercise', description: 'Physical exercise routines', created_at: '2023-04-01' },
+    { id: 10, name: 'Mindfulness', description: 'Present moment awareness', created_at: '2023-04-10' },
+    { id: 11, name: 'Self-Care', description: 'Personal care practices', created_at: '2023-04-15' },
+    { id: 12, name: 'Goal Setting', description: 'Achievement and goal planning', created_at: '2023-05-01' },
+    { id: 13, name: 'Time Management', description: 'Productivity and time use', created_at: '2023-05-10' },
+    { id: 14, name: 'Communication', description: 'Interpersonal communication skills', created_at: '2023-05-15' },
+    { id: 15, name: 'Leadership', description: 'Leadership development', created_at: '2023-06-01' }
+  ];
+
   const fetchTaxonomies = async (page = 1) => {
-    if (!token) return;
+    if (!token) {
+      // Use mock data when no token
+      const totalMockItems = mockTaxonomies.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = mockTaxonomies.slice(startIndex, endIndex);
+      
+      setTaxonomies(paginatedData);
+      setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await taxonomyService.getTaxonomies(token, page, itemsPerPage);
@@ -31,9 +61,18 @@ const Taxonomy = () => {
       setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
     } catch (error) {
       console.error('Error fetching taxonomies:', error);
+      // Fallback to mock data on error
+      const totalMockItems = mockTaxonomies.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = mockTaxonomies.slice(startIndex, endIndex);
+      
+      setTaxonomies(paginatedData);
+      setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
+      
       toast({
         title: "Error",
-        description: "Failed to fetch taxonomies",
+        description: "Failed to fetch taxonomies, showing sample data",
         variant: "destructive",
       });
     } finally {
