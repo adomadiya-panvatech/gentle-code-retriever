@@ -157,10 +157,10 @@ const Assignments = () => {
                   ) : (
                     assignments.map((assignment, index) => (
                       <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                        <TableCell className="text-blue-600">{assignment.user}</TableCell>
+                        <TableCell className="text-blue-600">{assignment.username}</TableCell>
                         <TableCell>{assignment.type}</TableCell>
-                        <TableCell>{assignment.scheduled}</TableCell>
-                        <TableCell>{assignment.expiry}</TableCell>
+                        <TableCell>{assignment.scheduled_for}</TableCell>
+                        <TableCell>{assignment.expiry_time}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <button 
