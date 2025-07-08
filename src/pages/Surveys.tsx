@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
 import { Search, Edit, Trash2, Link as LinkIcon, Copy, RefreshCw, Share } from 'lucide-react';
 
 const Surveys = () => {
@@ -14,6 +15,9 @@ const Surveys = () => {
     title: '',
     description: ''
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const itemsPerPage = 10;
 
   const mockSurveys = [
     { id: 1, title: 'WD40 Leave Challenge', description: 'Confirmation question for leaving WD-40 challenge', tag: 'No' },
@@ -40,6 +44,22 @@ const Surveys = () => {
     setIsFormOpen(false);
   };
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const filteredSurveys = mockSurveys.filter(survey =>
+    survey.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    survey.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const paginatedSurveys = filteredSurveys.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredSurveys.length / itemsPerPage);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -50,6 +70,17 @@ const Surveys = () => {
         >
           + Add new Survey
         </Button>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+        <Input
+          placeholder="Search surveys..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
       </div>
 
       <Card className="border-gray-200">
@@ -64,7 +95,7 @@ const Surveys = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockSurveys.map((survey) => (
+              {paginatedSurveys.map((survey) => (
                 <TableRow key={survey.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <TableCell>
                     <span className="text-blue-600 hover:underline cursor-pointer">
@@ -95,6 +126,42 @@ const Surveys = () => {
               ))}
             </TableBody>
           </Table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                    const page = i + 1;
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => handlePageChange(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
 

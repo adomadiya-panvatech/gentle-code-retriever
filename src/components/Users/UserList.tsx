@@ -11,7 +11,8 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Trash2, Edit, UserX, Search, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../ui/pagination';
+import { Trash2, Edit, UserX, Search, Plus } from 'lucide-react';
 import { useToast } from '../../hooks/use-toast';
 
 const UserList = () => {
@@ -26,17 +27,11 @@ const UserList = () => {
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
-  // const fetchUsers = () => {
-  //   if (user) {
-  //     userService.getUsers(localStorage.getItem('token')!).then(setUsers);
-  //   }
-  // };
-
-  const fetchUsers = async () => {
+  const fetchUsers = async (page = 1) => {
     if (!token) return;
     setLoading(true);
     try {
-      const response = await userService.getUsers(token, currentPage, itemsPerPage);
+      const response = await userService.getUsers(token, page, itemsPerPage);
       setUsers(response.data || response);
       setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
     } catch (error) {
@@ -72,77 +67,19 @@ const UserList = () => {
         },
       ];
       setUsers(fakeUsers);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchUsers();
+    fetchUsers(currentPage);
   }, [currentPage, token]);
-
-  // const handleDelete = async (id: string) => {
-  //   try {
-  //     await userService.deleteUser(id, localStorage.getItem('token')!);
-  //     fetchUsers();
-  //     toast({
-  //       title: "Success",
-  //       description: "User deleted successfully",
-  //     });
-  //   } catch (error) {
-  //     toast({
-  //       title: "Error",
-  //       description: "Failed to delete user",
-  //       variant: "destructive",
-  //     });
-  //   }
-  // };
-
-  const handleEdit = (u: any) => setEditing(u);
-
-  // const handleEditSubmit = async (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   try {
-  //     await userService.updateUser(editing.id, editing, localStorage.getItem('token')!);
-  //     setEditing(null);
-  //     fetchUsers();
-  //     toast({
-  //       title: "Success",
-  //       description: "User updated successfully",
-  //     });
-  //   } catch (error) {
-  //     toast({
-  //       title: "Error",
-  //       description: "Failed to update user",
-  //       variant: "destructive",
-  //     });
-  //   }
-  // };
-
-  // const handleBan = async (id: string) => {
-  //   try {
-  //     await userService.banUser(id, localStorage.getItem('token')!);
-  //     fetchUsers();
-  //     toast({
-  //       title: "Success",
-  //       description: "User banned successfully",
-  //     });
-  //   } catch (error) {
-  //     toast({
-  //       title: "Error",
-  //       description: "Failed to ban user",
-  //       variant: "destructive",
-  //     });
-  //   }
-  // };
 
   const handleDelete = async (id: string) => {
     try {
-      // await userService.deleteUser(id, localStorage.getItem('token')!);
-
-      // Remove user locally
       setUsers(prev => prev.filter(user => user.id !== id));
-
       toast({
         title: "Success",
         description: "User deleted successfully",
@@ -156,14 +93,13 @@ const UserList = () => {
     }
   };
 
+  const handleEdit = (u: any) => setEditing(u);
+
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // await userService.updateUser(editing.id, editing, localStorage.getItem('token')!);
-
       setUsers(prev => prev.map(u => u.id === editing.id ? editing : u));
       setEditing(null);
-
       toast({
         title: "Success",
         description: "User updated successfully",
@@ -179,12 +115,9 @@ const UserList = () => {
 
   const handleBan = async (id: string) => {
     try {
-      // await userService.banUser(id, localStorage.getItem('token')!);
-
       setUsers(prev =>
         prev.map(user => user.id === id ? { ...user, banned: true } : user)
       );
-
       toast({
         title: "Success",
         description: "User banned successfully",
@@ -198,10 +131,21 @@ const UserList = () => {
     }
   };
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   const filteredUsers = users.filter(u =>
     u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const calculatedTotalPages = Math.ceil(filteredUsers.length / itemsPerPage);
 
   if (!user) return <div className="text-center py-8 text-muted-foreground">Login required</div>;
 
@@ -230,7 +174,7 @@ const UserList = () => {
               <DialogTitle>Create New User</DialogTitle>
             </DialogHeader>
             <UserForm onUserCreated={() => {
-              fetchUsers();
+              fetchUsers(currentPage);
               setShowCreateForm(false);
             }} />
           </DialogContent>
@@ -257,7 +201,7 @@ const UserList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((u) => (
+                {paginatedUsers.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.name}</TableCell>
                     <TableCell>{u.email}</TableCell>
@@ -337,33 +281,44 @@ const UserList = () => {
               </TableBody>
             </Table>
           </div>
+
+          {/* Pagination */}
+          {calculatedTotalPages > 1 && (
+            <div className="p-4 border-t">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {[...Array(Math.min(5, calculatedTotalPages))].map((_, i) => {
+                    const page = i + 1;
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => handlePageChange(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => currentPage < calculatedTotalPages && handlePageChange(currentPage + 1)}
+                      className={currentPage === calculatedTotalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-4">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Previous
-          </Button>
-          <span className="text-sm text-gray-600">
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 };

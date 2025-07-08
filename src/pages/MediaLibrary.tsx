@@ -5,7 +5,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
-import { Search, Upload, Play, Eye, Trash2 } from 'lucide-react';
+import { Search, Upload, Play, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/use-toast';
 import * as videoService from '../services/videoService';
@@ -93,6 +93,14 @@ const MediaLibrary = () => {
   };
 
   const filteredData = getFilteredData();
+  
+  // Client-side pagination for filtered data
+  const paginatedData = filteredData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const calculatedTotalPages = Math.ceil(filteredData.length / itemsPerPage);
 
   return (
     <div className="space-y-6">
@@ -160,14 +168,14 @@ const MediaLibrary = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {filteredData.length === 0 ? (
+                        {paginatedData.length === 0 ? (
                           <tr>
                             <td colSpan={3} className="p-12 text-center text-gray-500">
                               No videos found
                             </td>
                           </tr>
                         ) : (
-                          filteredData.map((item) => (
+                          paginatedData.map((item) => (
                             <tr key={item.id} className="hover:bg-gray-50">
                               <td className="p-4">
                                 <div className="flex items-center gap-3">
@@ -200,7 +208,7 @@ const MediaLibrary = () => {
                   </div>
                   
                   {/* Pagination */}
-                  {totalPages > 1 && (
+                  {calculatedTotalPages > 1 && (
                     <div className="p-4 border-t">
                       <Pagination>
                         <PaginationContent>
@@ -210,7 +218,7 @@ const MediaLibrary = () => {
                               className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                             />
                           </PaginationItem>
-                          {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                          {[...Array(Math.min(5, calculatedTotalPages))].map((_, i) => {
                             const page = i + 1;
                             return (
                               <PaginationItem key={page}>
@@ -226,8 +234,8 @@ const MediaLibrary = () => {
                           })}
                           <PaginationItem>
                             <PaginationNext 
-                              onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
-                              className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                              onClick={() => currentPage < calculatedTotalPages && handlePageChange(currentPage + 1)}
+                              className={currentPage === calculatedTotalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                             />
                           </PaginationItem>
                         </PaginationContent>
@@ -256,41 +264,79 @@ const MediaLibrary = () => {
                   </div>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="border-b border-gray-200 bg-gray-50">
-                      <tr>
-                        <th className="text-left p-4 font-medium text-gray-900">Name</th>
-                        <th className="text-left p-4 font-medium text-gray-900">Modified</th>
-                        <th className="text-left p-4 font-medium text-gray-900">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {filteredData.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="p-4">
-                            <span className="font-medium text-blue-600">
-                              {item.name || item.title || 'Untitled'}
-                            </span>
-                          </td>
-                          <td className="p-4 text-gray-600">
-                            {item.updated_at || item.created_at || 'Unknown'}
-                          </td>
-                          <td className="p-4">
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="ghost" className="h-8 px-3 text-blue-600">
-                                ID: {item.id}
-                              </Button>
-                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </Button>
-                            </div>
-                          </td>
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="border-b border-gray-200 bg-gray-50">
+                        <tr>
+                          <th className="text-left p-4 font-medium text-gray-900">Name</th>
+                          <th className="text-left p-4 font-medium text-gray-900">Modified</th>
+                          <th className="text-left p-4 font-medium text-gray-900">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {paginatedData.map((item) => (
+                          <tr key={item.id} className="hover:bg-gray-50">
+                            <td className="p-4">
+                              <span className="font-medium text-blue-600">
+                                {item.name || item.title || 'Untitled'}
+                              </span>
+                            </td>
+                            <td className="p-4 text-gray-600">
+                              {item.updated_at || item.created_at || 'Unknown'}
+                            </td>
+                            <td className="p-4">
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="ghost" className="h-8 px-3 text-blue-600">
+                                  ID: {item.id}
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  {/* Pagination */}
+                  {calculatedTotalPages > 1 && (
+                    <div className="p-4 border-t">
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious 
+                              onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                              className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                            />
+                          </PaginationItem>
+                          {[...Array(Math.min(5, calculatedTotalPages))].map((_, i) => {
+                            const page = i + 1;
+                            return (
+                              <PaginationItem key={page}>
+                                <PaginationLink
+                                  onClick={() => handlePageChange(page)}
+                                  isActive={currentPage === page}
+                                  className="cursor-pointer"
+                                >
+                                  {page}
+                                </PaginationLink>
+                              </PaginationItem>
+                            );
+                          })}
+                          <PaginationItem>
+                            <PaginationNext 
+                              onClick={() => currentPage < calculatedTotalPages && handlePageChange(currentPage + 1)}
+                              className={currentPage === calculatedTotalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

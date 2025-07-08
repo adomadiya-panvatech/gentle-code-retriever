@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Input } from '../components/ui/input';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
 import { Search, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
@@ -12,6 +13,8 @@ const PersonalizationRules = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewRuleDialog, setShowNewRuleDialog] = useState(false);
   const [newRuleName, setNewRuleName] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const mockRules = [
     {
@@ -86,6 +89,22 @@ const PersonalizationRules = () => {
     setShowNewRuleDialog(false);
   };
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const filteredRules = mockRules.filter(rule =>
+    rule.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    rule.taxonomies.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const paginatedRules = filteredRules.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredRules.length / itemsPerPage);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -123,7 +142,7 @@ const PersonalizationRules = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockRules.map((rule, index) => (
+              {paginatedRules.map((rule, index) => (
                 <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
                   <TableCell className="font-medium">{rule.name}</TableCell>
                   <TableCell>
@@ -146,6 +165,42 @@ const PersonalizationRules = () => {
               ))}
             </TableBody>
           </Table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                    const page = i + 1;
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => handlePageChange(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
 
