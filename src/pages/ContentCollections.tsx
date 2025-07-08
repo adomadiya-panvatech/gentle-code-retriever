@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -6,6 +5,7 @@ import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Search, Plus, Eye, Edit3, Link as LinkIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import ContentCollectionForm from '../components/Content/ContentCollectionForm';
+import ViewModal from '../components/Modals/ViewModal';
 import { useAuth } from '../context/AuthContext';
 import { contentCollectionService } from '../services/contentCollectionService';
 import { useToast } from '../hooks/use-toast';
@@ -16,7 +16,9 @@ const ContentCollections = () => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [editingCollection, setEditingCollection] = useState(null);
+  const [viewingCollection, setViewingCollection] = useState(null);
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -30,10 +32,13 @@ const ContentCollections = () => {
   const fetchCollections = async () => {
     if (!token) {
       // Use mock data when no token
-      const totalMockItems = mockCollections.length;
+      const filtered = mockCollections.filter(collection =>
+        collection.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      const totalMockItems = filtered.length;
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockCollections.slice(startIndex, endIndex);
+      const paginatedData = filtered.slice(startIndex, endIndex);
       
       setCollections(paginatedData);
       setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
@@ -44,20 +49,26 @@ const ContentCollections = () => {
     try {
       const response = await contentCollectionService.getContentCollections(token);
       const allCollections = response.data || response;
-      const totalItems = allCollections.length;
+      const filtered = allCollections.filter((collection: any) =>
+        collection.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      const totalItems = filtered.length;
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
-      const paginatedData = allCollections.slice(startIndex, endIndex);
+      const paginatedData = filtered.slice(startIndex, endIndex);
       
       setCollections(paginatedData);
       setTotalPages(Math.ceil(totalItems / itemsPerPage));
     } catch (error) {
       console.error('Error fetching content collections:', error);
       // Fallback to mock data
-      const totalMockItems = mockCollections.length;
+      const filtered = mockCollections.filter(collection =>
+        collection.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      const totalMockItems = filtered.length;
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockCollections.slice(startIndex, endIndex);
+      const paginatedData = filtered.slice(startIndex, endIndex);
       
       setCollections(paginatedData);
       setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
@@ -195,14 +206,14 @@ const ContentCollections = () => {
     }
   ];
 
-  const filteredCollections = (collections.length > 0 ? collections : mockCollections).filter(collection =>
-    collection.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    collection.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const handleEdit = (collection: any) => {
     setEditingCollection(collection);
     setShowForm(true);
+  };
+
+  const handleView = (collection: any) => {
+    setViewingCollection(collection);
+    setShowViewModal(true);
   };
 
   const handleAdd = () => {
@@ -210,17 +221,19 @@ const ContentCollections = () => {
     setShowForm(true);
   };
 
-  const handleView = (collection: any) => {
-    console.log('Viewing collection:', collection);
-    toast({
-      title: "Collection Viewed",
-      description: `Viewing ${collection.name}`,
-    });
-  };
-
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
+
+  // Re-fetch when search term changes
+  useEffect(() => {
+    fetchCollections();
+  }, [searchTerm]);
 
   return (
     <div className="space-y-6">
@@ -228,111 +241,77 @@ const ContentCollections = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-black">Content Collections</h1>
         <Button 
-          className="bg-green-600 hover:bg-green-700 text-white"
           onClick={handleAdd}
+          className="bg-green-600 hover:bg-green-700 text-white"
         >
           <Plus className="w-4 h-4 mr-2" />
-          Add Content Collection
+          Add Collection
         </Button>
       </div>
 
       {/* Search */}
-      <Card className="border-gray-200">
-        <CardContent className="p-4">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-            <Input
-              placeholder="Search collections..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 border-gray-300"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex justify-end">
+        <div className="relative w-80">
+          <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search collections..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            className="pl-10"
+          />
+        </div>
+      </div>
 
-      {/* Collections Table */}
-      <Card className="border-gray-200">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b border-gray-200 bg-gray-50">
-                <tr>
-                  <th className="text-left p-4 font-medium text-gray-900">Name</th>
-                  <th className="text-left p-4 font-medium text-gray-900">Description</th>
-                  <th className="text-left p-4 font-medium text-gray-900">Content</th>
-                  <th className="text-left p-4 font-medium text-gray-900">Taxonomies</th>
-                  <th className="text-left p-4 font-medium text-gray-900">Activities</th>
-                  <th className="text-left p-4 font-medium text-gray-900">Private</th>
-                  <th className="text-left p-4 font-medium text-gray-900">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="p-8 text-center text-gray-500">
-                      Loading collections...
-                    </td>
-                  </tr>
-                ) : filteredCollections.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-8 text-center text-gray-500">
-                      No collections found
-                    </td>
-                  </tr>
-                ) : (
-                  filteredCollections.map((collection) => (
-                  <tr key={collection.id} className="hover:bg-gray-50">
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
-                          <div className="w-8 h-8 bg-gray-100 rounded"></div>
-                        </div>
-                        <span className="font-medium text-blue-600">{collection.name}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-gray-600 max-w-md">
-                      <p className="truncate">{collection.description}</p>
-                    </td>
-                    <td className="p-4 text-center">{collection.content}</td>
-                    <td className="p-4 text-gray-600">{collection.taxonomies}</td>
-                    <td className="p-4 text-center">{collection.activities}</td>
-                    <td className="p-4">
-                      <Badge className="bg-gray-100 text-gray-800">
-                        {collection.private}
-                      </Badge>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleView(collection)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleEdit(collection)}
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                          <LinkIcon className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+      {/* Collections Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loading ? (
+          <div className="col-span-full text-center py-12">Loading collections...</div>
+        ) : collections.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-gray-500">
+            {searchTerm ? `No collections found matching "${searchTerm}"` : 'No collections found'}
           </div>
-        </CardContent>
-      </Card>
+        ) : (
+          collections.map((collection) => (
+            <Card key={collection.id} className="border-gray-200 hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  {collection.image && (
+                    <img 
+                      src={collection.image} 
+                      alt={collection.name}
+                      className="w-full h-40 object-cover rounded"
+                    />
+                  )}
+                  <h3 className="font-semibold text-lg text-gray-900">{collection.name}</h3>
+                  <p className="text-gray-600 text-sm line-clamp-3">{collection.description}</p>
+                  <div className="flex justify-between text-sm text-gray-500">
+                    <span>{collection.content} content items</span>
+                    <Badge variant="outline">{collection.private}</Badge>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleView(collection)}
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      View
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleEdit(collection)}
+                    >
+                      <Edit3 className="w-4 h-4 mr-1" />
+                      Edit
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -370,7 +349,6 @@ const ContentCollections = () => {
         </div>
       )}
 
-      {/* Form Dialog */}
       <ContentCollectionForm
         isOpen={showForm}
         onClose={() => {
@@ -378,6 +356,17 @@ const ContentCollections = () => {
           setEditingCollection(null);
         }}
         collection={editingCollection}
+      />
+
+      <ViewModal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setViewingCollection(null);
+        }}
+        title="View Collection"
+        data={viewingCollection}
+        type="collection"
       />
     </div>
   );

@@ -1,16 +1,15 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
-import { Plus, Tags } from 'lucide-react';
+import { Plus, Tags, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/use-toast';
 import * as taxonomyService from '../services/taxonomyService';
 
 const Taxonomy = () => {
-  const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingTaxonomy, setEditingTaxonomy] = useState(null);
   const [taxonomies, setTaxonomies] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -84,6 +83,25 @@ const Taxonomy = () => {
     fetchTaxonomies(currentPage);
   }, [currentPage, token]);
 
+  const handleEdit = (taxonomy: any) => {
+    setEditingTaxonomy(taxonomy);
+    toast({
+      title: "Edit Taxonomy",
+      description: `Opening edit form for ${taxonomy.name}`,
+    });
+    // Here you would open an edit modal/form
+    console.log('Editing taxonomy:', taxonomy);
+  };
+
+  const handleDelete = (taxonomy: any) => {
+    toast({
+      title: "Delete Taxonomy",
+      description: `Are you sure you want to delete ${taxonomy.name}?`,
+      variant: "destructive",
+    });
+    console.log('Deleting taxonomy:', taxonomy);
+  };
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
@@ -152,8 +170,22 @@ const Taxonomy = () => {
                       <TableCell>{taxonomy.created_at || taxonomy.createdAt}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline">Edit</Button>
-                          <Button size="sm" variant="outline">Delete</Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleEdit(taxonomy)}
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleDelete(taxonomy)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Delete
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>

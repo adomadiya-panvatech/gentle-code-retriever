@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
 import PlanTemplateForm from '../components/Content/PlanTemplateForm';
+import ViewModal from '../components/Modals/ViewModal';
 import { Trash2, Link as LinkIcon, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/use-toast';
@@ -12,7 +12,9 @@ import * as planService from '../services/planService';
 
 const PlanTemplates = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
+  const [viewingTemplate, setViewingTemplate] = useState(null);
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -98,11 +100,8 @@ const PlanTemplates = () => {
   };
 
   const handleView = (template: any) => {
-    console.log('Viewing template:', template);
-    toast({
-      title: "Template Viewed",
-      description: `Viewing ${template.name}`,
-    });
+    setViewingTemplate(template);
+    setShowViewModal(true);
   };
 
   const handleAdd = () => {
@@ -228,8 +227,22 @@ const PlanTemplates = () => {
 
       <PlanTemplateForm
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
+        onClose={() => {
+          setIsFormOpen(false);
+          setEditingTemplate(null);
+        }}
         template={editingTemplate}
+      />
+
+      <ViewModal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setViewingTemplate(null);
+        }}
+        title="View Plan Template"
+        data={viewingTemplate}
+        type="template"
       />
     </div>
   );

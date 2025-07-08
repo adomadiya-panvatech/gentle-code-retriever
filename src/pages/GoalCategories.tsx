@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Input } from '../components/ui/input';
 import GoalCategoryForm from '../components/Content/GoalCategoryForm';
+import ViewModal from '../components/Modals/ViewModal';
 import { Search, Edit, Trash2, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { goalCategoryService } from '../services/goalCategoryService';
@@ -15,7 +15,9 @@ const GoalCategories = () => {
   const { token } = useAuth();
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [viewingCategory, setViewingCategory] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -25,15 +27,18 @@ const GoalCategories = () => {
 
   useEffect(() => {
     fetchCategories();
-  }, [currentPage, token]);
+  }, [currentPage, searchTerm, token]);
 
   const fetchCategories = async () => {
     if (!token) {
       // Use mock data when no token
-      const totalMockItems = mockCategories.length;
+      const filtered = mockCategories.filter(category =>
+        category.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      const totalMockItems = filtered.length;
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockCategories.slice(startIndex, endIndex);
+      const paginatedData = filtered.slice(startIndex, endIndex);
       
       setCategories(paginatedData);
       setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
@@ -44,20 +49,26 @@ const GoalCategories = () => {
     try {
       const response = await goalCategoryService.getGoalCategories(token, currentPage, itemsPerPage);
       const allCategories = response.data || response;
-      const totalItems = allCategories.length;
+      const filtered = allCategories.filter((category: any) =>
+        category.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      const totalItems = filtered.length;
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
-      const paginatedData = allCategories.slice(startIndex, endIndex);
+      const paginatedData = filtered.slice(startIndex, endIndex);
       
       setCategories(paginatedData);
       setTotalPages(Math.ceil(totalItems / itemsPerPage));
     } catch (error) {
       console.error('Error fetching goal categories:', error);
       // Fallback to mock data
-      const totalMockItems = mockCategories.length;
+      const filtered = mockCategories.filter(category =>
+        category.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      const totalMockItems = filtered.length;
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockCategories.slice(startIndex, endIndex);
+      const paginatedData = filtered.slice(startIndex, endIndex);
       
       setCategories(paginatedData);
       setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
@@ -160,21 +171,14 @@ const GoalCategories = () => {
     }
   ];
 
-  const filteredCategories = (categories.length > 0 ? categories : mockCategories).filter(category =>
-    category.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const handleEdit = (category: any) => {
     setEditingCategory(category);
     setIsFormOpen(true);
   };
 
   const handleView = (category: any) => {
-    console.log('Viewing category:', category);
-    toast({
-      title: "Category Viewed",
-      description: `Viewing ${category.name}`,
-    });
+    setViewingCategory(category);
+    setShowViewModal(true);
   };
 
   const handleAdd = () => {
@@ -184,6 +188,11 @@ const GoalCategories = () => {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
   };
 
   return (
@@ -207,7 +216,7 @@ const GoalCategories = () => {
           <Input
             placeholder="Search categories..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={handleSearchChange}
             className="pl-10"
           />
         </div>
@@ -234,14 +243,14 @@ const GoalCategories = () => {
                     Loading categories...
                   </TableCell>
                 </TableRow>
-              ) : filteredCategories.length === 0 ? (
+              ) : categories.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="p-8 text-center text-gray-500">
-                    No categories found
+                    {searchTerm ? `No categories found matching "${searchTerm}"` : 'No categories found'}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCategories.map((category) => (
+                categories.map((category) => (
                   <TableRow key={category.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <TableCell>
                       <button className="w-6 h-6 border border-gray-300 rounded flex items-center justify-center hover:bg-gray-100">
@@ -327,8 +336,22 @@ const GoalCategories = () => {
 
       <GoalCategoryForm
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
+        onClose={() => {
+          setIsFormOpen(false);
+          setEditingCategory(null);
+        }}
         category={editingCategory}
+      />
+
+      <ViewModal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setViewingCategory(null);
+        }}
+        title="View Goal Category"
+        data={viewingCategory}
+        type="category"
       />
     </div>
   );

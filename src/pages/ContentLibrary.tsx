@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -10,6 +9,7 @@ import { Search, Plus, Link as LinkIcon, Eye, Edit3 } from 'lucide-react';
 import TipForm from '../components/Content/TipForm';
 import ArticleForm from '../components/Content/ArticleForm';
 import HTMLCardForm from '../components/Content/HTMLCardForm';
+import ViewModal from '../components/Modals/ViewModal';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/use-toast';
 import * as tipService from '../services/tipService';
@@ -21,7 +21,9 @@ const ContentLibrary = () => {
   const [showTipForm, setShowTipForm] = useState(false);
   const [showArticleForm, setShowArticleForm] = useState(false);
   const [showHTMLCardForm, setShowHTMLCardForm] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [viewingItem, setViewingItem] = useState(null);
   const [tips, setTips] = useState<any[]>([]);
   const [content, setContent] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -114,8 +116,8 @@ const ContentLibrary = () => {
   };
 
   const handleView = (item: any) => {
-    console.log('Viewing item:', item);
-    // Implement view functionality
+    setViewingItem(item);
+    setShowViewModal(true);
   };
 
   const handleAddTip = () => {
@@ -370,6 +372,17 @@ const ContentLibrary = () => {
           setEditingItem(null);
         }}
         card={editingItem}
+      />
+
+      <ViewModal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setViewingItem(null);
+        }}
+        title={`View ${viewingItem?.type || 'Content'}`}
+        data={viewingItem}
+        type="content"
       />
     </div>
   );

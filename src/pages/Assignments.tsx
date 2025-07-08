@@ -5,6 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Checkbox } from '../components/ui/checkbox';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
+import ViewModal from '../components/Modals/ViewModal';
+import { Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { assignmentService } from '../services/assignmentService';
 import { useToast } from '../hooks/use-toast';
@@ -13,6 +15,8 @@ const Assignments = () => {
   const { token } = useAuth();
   const { toast } = useToast();
   const [showCardPreviews, setShowCardPreviews] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingAssignment, setViewingAssignment] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -87,6 +91,11 @@ const Assignments = () => {
     }
   };
 
+  const handleView = (assignment: any) => {
+    setViewingAssignment(assignment);
+    setShowViewModal(true);
+  };
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
@@ -154,7 +163,12 @@ const Assignments = () => {
                         <TableCell>{assignment.expiry}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <button className="text-blue-600 hover:underline text-sm">View</button>
+                            <button 
+                              className="p-1 hover:bg-gray-100 rounded"
+                              onClick={() => handleView(assignment)}
+                            >
+                              <Eye className="w-4 h-4 text-gray-500" />
+                            </button>
                             <button className="text-blue-600 hover:underline text-sm">Edit</button>
                           </div>
                         </TableCell>
@@ -243,6 +257,17 @@ const Assignments = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ViewModal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setViewingAssignment(null);
+        }}
+        title="View Assignment"
+        data={viewingAssignment}
+        type="assignment"
+      />
     </div>
   );
 };

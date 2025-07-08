@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -7,10 +6,13 @@ import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
-import { Search, Edit, Trash2, Link as LinkIcon, Copy, RefreshCw, Share } from 'lucide-react';
+import { Search, Edit, Trash2, Link as LinkIcon, Copy, RefreshCw, Share, Eye } from 'lucide-react';
+import ViewModal from '../components/Modals/ViewModal';
 
 const Surveys = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingSurvey, setViewingSurvey] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: ''
@@ -39,6 +41,11 @@ const Surveys = () => {
     setIsFormOpen(true);
   };
 
+  const handleView = (survey: any) => {
+    setViewingSurvey(survey);
+    setShowViewModal(true);
+  };
+
   const handleSave = () => {
     console.log('Saving survey:', formData);
     setIsFormOpen(false);
@@ -46,6 +53,11 @@ const Surveys = () => {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
   };
 
   const filteredSurveys = mockSurveys.filter(survey =>
@@ -78,7 +90,7 @@ const Surveys = () => {
         <Input
           placeholder="Search surveys..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearchChange}
           className="pl-10"
         />
       </div>
@@ -95,35 +107,49 @@ const Surveys = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedSurveys.map((survey) => (
-                <TableRow key={survey.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <TableCell>
-                    <span className="text-blue-600 hover:underline cursor-pointer">
-                      {survey.title}
-                    </span>
-                  </TableCell>
-                  <TableCell>{survey.description}</TableCell>
-                  <TableCell>
-                    <span className="px-2 py-1 bg-gray-100 rounded text-sm">{survey.tag}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <button className="p-1 hover:bg-gray-100 rounded">
-                        <Copy className="w-4 h-4 text-gray-500" />
-                      </button>
-                      <button className="p-1 hover:bg-gray-100 rounded">
-                        <LinkIcon className="w-4 h-4 text-gray-500" />
-                      </button>
-                      <button className="p-1 hover:bg-gray-100 rounded">
-                        <RefreshCw className="w-4 h-4 text-gray-500" />
-                      </button>
-                      <button className="p-1 hover:bg-gray-100 rounded">
-                        <Share className="w-4 h-4 text-gray-500" />
-                      </button>
-                    </div>
+              {paginatedSurveys.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="p-8 text-center text-gray-500">
+                    {searchTerm ? `No surveys found matching "${searchTerm}"` : 'No surveys found'}
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                paginatedSurveys.map((survey) => (
+                  <TableRow key={survey.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <TableCell>
+                      <span className="text-blue-600 hover:underline cursor-pointer">
+                        {survey.title}
+                      </span>
+                    </TableCell>
+                    <TableCell>{survey.description}</TableCell>
+                    <TableCell>
+                      <span className="px-2 py-1 bg-gray-100 rounded text-sm">{survey.tag}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          className="p-1 hover:bg-gray-100 rounded"
+                          onClick={() => handleView(survey)}
+                        >
+                          <Eye className="w-4 h-4 text-gray-500" />
+                        </button>
+                        <button className="p-1 hover:bg-gray-100 rounded">
+                          <Copy className="w-4 h-4 text-gray-500" />
+                        </button>
+                        <button className="p-1 hover:bg-gray-100 rounded">
+                          <LinkIcon className="w-4 h-4 text-gray-500" />
+                        </button>
+                        <button className="p-1 hover:bg-gray-100 rounded">
+                          <RefreshCw className="w-4 h-4 text-gray-500" />
+                        </button>
+                        <button className="p-1 hover:bg-gray-100 rounded">
+                          <Share className="w-4 h-4 text-gray-500" />
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
 
@@ -200,6 +226,17 @@ const Surveys = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ViewModal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setViewingSurvey(null);
+        }}
+        title="View Survey"
+        data={viewingSurvey}
+        type="survey"
+      />
     </div>
   );
 };

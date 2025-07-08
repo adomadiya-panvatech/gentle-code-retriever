@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
-import { Upload } from 'lucide-react';
+import { Upload, Eye } from 'lucide-react';
+import ViewModal from '../components/Modals/ViewModal';
 import { useAuth } from '../context/AuthContext';
 import { communityGroupService } from '../services/communityGroupService';
 import { useToast } from '../hooks/use-toast';
@@ -15,6 +16,8 @@ const CommunityGroups = () => {
   const { token } = useAuth();
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingGroup, setViewingGroup] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -28,7 +31,6 @@ const CommunityGroups = () => {
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
-  // Mock data for demonstration
   const mockGroups = [
     { id: 1, name: 'Kelley Marie Wellness', image: '/placeholder-image.jpg', lastUpdated: 'Nov 18, 2022 3:01 AM', created: 'Nov 18, 2022 3:01 AM' },
     { id: 2, name: 'Career-Focused Women', image: '/lovable-uploads/50965e3a-b9ef-4d7c-a90e-53cbd6a5a519.png', lastUpdated: 'Nov 4, 2022 12:30 AM', created: '' },
@@ -98,6 +100,11 @@ const CommunityGroups = () => {
     setIsFormOpen(true);
   };
 
+  const handleView = (group: any) => {
+    setViewingGroup(group);
+    setShowViewModal(true);
+  };
+
   const handleSave = () => {
     console.log('Saving community group:', formData);
     setIsFormOpen(false);
@@ -128,18 +135,19 @@ const CommunityGroups = () => {
                 <TableHead className="font-semibold text-gray-900">Name</TableHead>
                 <TableHead className="font-semibold text-gray-900">Last updated</TableHead>
                 <TableHead className="font-semibold text-gray-900">Created</TableHead>
+                <TableHead className="font-semibold text-gray-900">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="p-8 text-center text-gray-500">
+                  <TableCell colSpan={5} className="p-8 text-center text-gray-500">
                     Loading community groups...
                   </TableCell>
                 </TableRow>
               ) : groups.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="p-8 text-center text-gray-500">
+                  <TableCell colSpan={5} className="p-8 text-center text-gray-500">
                     No community groups found
                   </TableCell>
                 </TableRow>
@@ -158,6 +166,14 @@ const CommunityGroups = () => {
                     </TableCell>
                     <TableCell>{group.lastUpdated}</TableCell>
                     <TableCell>{group.created}</TableCell>
+                    <TableCell>
+                      <button 
+                        className="p-1 hover:bg-gray-100 rounded"
+                        onClick={() => handleView(group)}
+                      >
+                        <Eye className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -265,6 +281,17 @@ const CommunityGroups = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ViewModal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setViewingGroup(null);
+        }}
+        title="View Community Group"
+        data={viewingGroup}
+        type="group"
+      />
     </div>
   );
 };
