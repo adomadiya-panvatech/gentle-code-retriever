@@ -8,7 +8,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { Search, Upload, Trash2, Edit, Eye } from 'lucide-react';
 import ViewModal from '../components/Modals/ViewModal';
 import { useAuth } from '../context/AuthContext';
-import { mediaService } from '../services/mediaService';
+import { getVideos } from '../services/videoService';
 import { useToast } from '../hooks/use-toast';
 
 const MediaLibrary = () => {
@@ -64,7 +64,7 @@ const MediaLibrary = () => {
 
     setLoading(true);
     try {
-      const response = await mediaService.getMedia(token);
+      const response = await getVideos(token);
       const allMedia = response.data || response;
       const filtered = allMedia.filter((item: any) => {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
