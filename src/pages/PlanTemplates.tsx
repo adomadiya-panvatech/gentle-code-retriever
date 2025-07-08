@@ -5,7 +5,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
 import PlanTemplateForm from '../components/Content/PlanTemplateForm';
-import { Trash2, Link as LinkIcon } from 'lucide-react';
+import { Trash2, Link as LinkIcon, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/use-toast';
 import * as planService from '../services/planService';
@@ -23,19 +23,64 @@ const PlanTemplates = () => {
   const { toast } = useToast();
   const token = localStorage.getItem('token');
 
+  // Extended mock data for better demonstration
+  const mockTemplates = [
+    { id: 1, name: 'Beginner Wellness Plan', activities: 5, taxonomies: 3, description: 'A starter plan for wellness journey' },
+    { id: 2, name: 'Advanced Fitness Plan', activities: 12, taxonomies: 5, description: 'Comprehensive fitness program' },
+    { id: 3, name: 'Mental Health Focus', activities: 8, taxonomies: 4, description: 'Focus on mental wellness' },
+    { id: 4, name: 'Nutrition Basics', activities: 6, taxonomies: 2, description: 'Basic nutrition guidance' },
+    { id: 5, name: 'Sleep Optimization', activities: 4, taxonomies: 2, description: 'Improve sleep quality' },
+    { id: 6, name: 'Stress Management', activities: 7, taxonomies: 3, description: 'Manage daily stress' },
+    { id: 7, name: 'Work-Life Balance', activities: 9, taxonomies: 4, description: 'Balance professional and personal life' },
+    { id: 8, name: 'Mindfulness Practice', activities: 5, taxonomies: 2, description: 'Daily mindfulness exercises' },
+    { id: 9, name: 'Healthy Habits', activities: 10, taxonomies: 5, description: 'Build lasting healthy habits' },
+    { id: 10, name: 'Exercise Fundamentals', activities: 8, taxonomies: 3, description: 'Basic exercise routines' },
+    { id: 11, name: 'Emotional Wellness', activities: 6, taxonomies: 3, description: 'Emotional health support' },
+    { id: 12, name: 'Social Connection', activities: 4, taxonomies: 2, description: 'Building social relationships' },
+    { id: 13, name: 'Energy Boost', activities: 7, taxonomies: 3, description: 'Natural energy enhancement' },
+    { id: 14, name: 'Productivity Focus', activities: 8, taxonomies: 4, description: 'Increase daily productivity' },
+    { id: 15, name: 'Recovery Plan', activities: 5, taxonomies: 2, description: 'Post-workout recovery' }
+  ];
+
   const fetchTemplates = async (page = 1) => {
-    if (!token) return;
+    if (!token) {
+      // Use mock data when no token
+      const totalMockItems = mockTemplates.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = mockTemplates.slice(startIndex, endIndex);
+      
+      setTemplates(paginatedData);
+      setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await planService.getPlans(token, page, itemsPerPage);
       console.log('Plan templates response:', response);
-      setTemplates(response.data || response);
-      setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
+      const allTemplates = response.data || response;
+      const totalItems = allTemplates.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = allTemplates.slice(startIndex, endIndex);
+      
+      setTemplates(paginatedData);
+      setTotalPages(Math.ceil(totalItems / itemsPerPage));
     } catch (error) {
       console.error('Error fetching plan templates:', error);
+      // Fallback to mock data
+      const totalMockItems = mockTemplates.length;
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = mockTemplates.slice(startIndex, endIndex);
+      
+      setTemplates(paginatedData);
+      setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
+      
       toast({
         title: "Error",
-        description: "Failed to fetch plan templates",
+        description: "Failed to fetch plan templates, showing sample data",
         variant: "destructive",
       });
     } finally {
@@ -50,6 +95,14 @@ const PlanTemplates = () => {
   const handleEdit = (template: any) => {
     setEditingTemplate(template);
     setIsFormOpen(true);
+  };
+
+  const handleView = (template: any) => {
+    console.log('Viewing template:', template);
+    toast({
+      title: "Template Viewed",
+      description: `Viewing ${template.name}`,
+    });
   };
 
   const handleAdd = () => {
@@ -113,6 +166,12 @@ const PlanTemplates = () => {
                         <TableCell>{template.taxonomies || 0}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
+                            <button 
+                              className="p-1 hover:bg-gray-100 rounded"
+                              onClick={() => handleView(template)}
+                            >
+                              <Eye className="w-4 h-4 text-gray-500" />
+                            </button>
                             <button className="p-1 hover:bg-gray-100 rounded">
                               <Trash2 className="w-4 h-4 text-gray-500" />
                             </button>

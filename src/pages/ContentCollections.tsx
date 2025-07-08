@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -8,6 +9,7 @@ import ContentCollectionForm from '../components/Content/ContentCollectionForm';
 import { useAuth } from '../context/AuthContext';
 import { contentCollectionService } from '../services/contentCollectionService';
 import { useToast } from '../hooks/use-toast';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../components/ui/pagination';
 
 const ContentCollections = () => {
   const { token } = useAuth();
@@ -26,17 +28,43 @@ const ContentCollections = () => {
   }, [currentPage, token]);
 
   const fetchCollections = async () => {
-    if (!token) return;
+    if (!token) {
+      // Use mock data when no token
+      const totalMockItems = mockCollections.length;
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = mockCollections.slice(startIndex, endIndex);
+      
+      setCollections(paginatedData);
+      setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await contentCollectionService.getContentCollections(token);
-      setCollections(response.data || response);
-      setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
+      const allCollections = response.data || response;
+      const totalItems = allCollections.length;
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = allCollections.slice(startIndex, endIndex);
+      
+      setCollections(paginatedData);
+      setTotalPages(Math.ceil(totalItems / itemsPerPage));
     } catch (error) {
       console.error('Error fetching content collections:', error);
+      // Fallback to mock data
+      const totalMockItems = mockCollections.length;
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = mockCollections.slice(startIndex, endIndex);
+      
+      setCollections(paginatedData);
+      setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
+      
       toast({
         title: "Error",
-        description: "Failed to load content collections",
+        description: "Failed to load content collections, showing sample data",
         variant: "destructive",
       });
     } finally {
@@ -97,12 +125,72 @@ const ContentCollections = () => {
     },
     {
       id: 6,
-      name: "Alyson's Favorites",
-      description: "A mom of two young girls and part of the Wellness product team.",
-      content: 3,
-      taxonomies: "none",
-      activities: "none",
+      name: "Wellness Journey",
+      description: "A comprehensive wellness journey focusing on mental and physical health.",
+      content: 15,
+      taxonomies: "health",
+      activities: 3,
+      private: "Public",
+      image: "/lovable-uploads/placeholder-image.jpg"
+    },
+    {
+      id: 7,
+      name: "Mindful Eating",
+      description: "Learn to eat mindfully and develop a healthy relationship with food.",
+      content: 8,
+      taxonomies: "nutrition",
+      activities: 2,
       private: "Private",
+      image: "/lovable-uploads/placeholder-image.jpg"
+    },
+    {
+      id: 8,
+      name: "Stress Management",
+      description: "Effective techniques for managing daily stress and anxiety.",
+      content: 12,
+      taxonomies: "mental-health",
+      activities: 4,
+      private: "Public",
+      image: "/lovable-uploads/placeholder-image.jpg"
+    },
+    {
+      id: 9,
+      name: "Exercise Fundamentals",
+      description: "Basic exercises and routines for beginners to start their fitness journey.",
+      content: 20,
+      taxonomies: "fitness",
+      activities: 5,
+      private: "Private",
+      image: "/lovable-uploads/placeholder-image.jpg"
+    },
+    {
+      id: 10,
+      name: "Sleep Optimization",
+      description: "Tips and strategies for improving sleep quality and duration.",
+      content: 7,
+      taxonomies: "sleep",
+      activities: 2,
+      private: "Public",
+      image: "/lovable-uploads/placeholder-image.jpg"
+    },
+    {
+      id: 11,
+      name: "Healthy Habits",
+      description: "Building sustainable healthy habits for long-term wellness.",
+      content: 14,
+      taxonomies: "lifestyle",
+      activities: 3,
+      private: "Private",
+      image: "/lovable-uploads/placeholder-image.jpg"
+    },
+    {
+      id: 12,
+      name: "Work-Life Balance",
+      description: "Strategies for maintaining balance between professional and personal life.",
+      content: 11,
+      taxonomies: "balance",
+      activities: 4,
+      private: "Public",
       image: "/lovable-uploads/placeholder-image.jpg"
     }
   ];
@@ -124,7 +212,14 @@ const ContentCollections = () => {
 
   const handleView = (collection: any) => {
     console.log('Viewing collection:', collection);
-    // Implement view functionality
+    toast({
+      title: "Collection Viewed",
+      description: `Viewing ${collection.name}`,
+    });
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   return (
@@ -241,26 +336,37 @@ const ContentCollections = () => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-4">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Previous
-          </Button>
-          <span className="text-sm text-gray-600">
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+        <div className="flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+              {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                const page = i + 1;
+                return (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      onClick={() => handlePageChange(page)}
+                      isActive={currentPage === page}
+                      className="cursor-pointer"
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
 
