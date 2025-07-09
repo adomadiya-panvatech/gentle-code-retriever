@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -8,6 +7,43 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { Search, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
+import { personalizationRuleService } from '../services/personalizationRuleService';
+import { useAuth } from '../context/AuthContext';
+
+// Helper function for mm-dd-yyyy date format
+function formatDate(dateStr: string | Date | undefined): string {
+  if (!dateStr) return 'N/A';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 'N/A';
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${mm}-${dd}-${yyyy}`;
+}
+
+function getPaginationRange(current, total) {
+  const delta = 2;
+  const range = [];
+  const rangeWithDots = [];
+  let l;
+  for (let i = 1; i <= total; i++) {
+    if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+      range.push(i);
+    }
+  }
+  for (let i of range) {
+    if (l) {
+      if (i - l === 2) {
+        rangeWithDots.push(l + 1);
+      } else if (i - l > 2) {
+        rangeWithDots.push('...');
+      }
+    }
+    rangeWithDots.push(i);
+    l = i;
+  }
+  return rangeWithDots;
+}
 
 const PersonalizationRules = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,6 +51,9 @@ const PersonalizationRules = () => {
   const [newRuleName, setNewRuleName] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const { token } = useAuth();
+  const [rules, setRules] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const mockRules = [
     {
@@ -83,6 +122,26 @@ const PersonalizationRules = () => {
     }
   ];
 
+  useEffect(() => {
+    const fetchRules = async () => {
+      setLoading(true);
+      try {
+        if (!token) {
+          setRules(mockRules);
+        } else {
+          const data = await personalizationRuleService.getPersonalizationRules(token);
+          setRules(data.data || data); // support both array and paginated response
+        }
+      } catch (error) {
+        setRules(mockRules);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRules();
+    // eslint-disable-next-line
+  }, [token]);
+
   const handleCreateRule = () => {
     console.log('Creating new rule:', newRuleName);
     setNewRuleName('');
@@ -93,9 +152,9 @@ const PersonalizationRules = () => {
     setCurrentPage(page);
   };
 
-  const filteredRules = mockRules.filter(rule =>
-    rule.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    rule.taxonomies.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredRules = rules.filter(rule =>
+    (rule.name || rule.rule_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (rule.taxonomies || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const paginatedRules = filteredRules.slice(
@@ -142,27 +201,41 @@ const PersonalizationRules = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedRules.map((rule, index) => (
-                <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                  <TableCell className="font-medium">{rule.name}</TableCell>
-                  <TableCell>
-                    <span className="text-blue-600">{rule.conditions}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-blue-600">{rule.actions}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-gray-700">{rule.state} ▼</span>
-                  </TableCell>
-                  <TableCell className="text-sm text-gray-600">{rule.lastUpdated}</TableCell>
-                  <TableCell className="text-sm text-gray-600">{rule.taxonomies}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm">
-                      <Trash2 className="h-4 w-4 text-gray-400" />
-                    </Button>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="p-8 text-center text-gray-500">
+                    Loading personalization rules...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : paginatedRules.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="p-8 text-center text-gray-500">
+                    No personalization rules found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedRules.map((rule, index) => (
+                  <TableRow key={rule.id || index} className="border-b border-gray-100 hover:bg-gray-50">
+                    <TableCell className="font-medium">{rule.rule_name}</TableCell>
+                    <TableCell>
+                      <span className="text-blue-600">{Object.keys(rule.conditions || {}).length} condition</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-blue-600">{Object.keys(rule.actions || {}).length} action{Object.keys(rule.actions || {}).length !== 1 ? 's' : ''}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-gray-700">{rule.state}</span>
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-600">{formatDate(rule.updatedAt || rule.updated)}</TableCell>
+                    <TableCell className="text-sm text-gray-600">{rule.status}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm">
+                        <Trash2 className="h-4 w-4 text-gray-400" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
 
@@ -177,20 +250,25 @@ const PersonalizationRules = () => {
                       className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                     />
                   </PaginationItem>
-                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                    const page = i + 1;
-                    return (
-                      <PaginationItem key={page}>
-                        <PaginationLink
-                          onClick={() => handlePageChange(page)}
-                          isActive={currentPage === page}
-                          className="cursor-pointer"
-                        >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
+                  {getPaginationRange(currentPage, totalPages).map((page, idx) =>
+                    page === '...'
+                      ? (
+                        <PaginationItem key={"ellipsis-" + idx}>
+                          <span className="px-2">...</span>
+                        </PaginationItem>
+                      )
+                      : (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => handlePageChange(page)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )
+                  )}
                   <PaginationItem>
                     <PaginationNext 
                       onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}

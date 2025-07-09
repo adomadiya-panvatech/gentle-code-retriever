@@ -26,6 +26,7 @@ const CommunityGroups = () => {
     image: null
   });
   const [groups, setGroups] = useState([]);
+  const [allGroups, setAllGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -46,35 +47,36 @@ const CommunityGroups = () => {
     { id: 12, name: 'Young Entrepreneurs', image: '/placeholder-image.jpg', lastUpdated: 'May 15, 2022 6:30 PM', created: 'May 15, 2022 6:30 PM' }
   ];
 
-  const fetchGroups = async (page = 1) => {
-    if (!token) {
-      // Use mock data when no token
-      const totalItems = mockGroups.length;
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockGroups.slice(startIndex, endIndex);
-      
-      setGroups(paginatedData);
-      setTotalPages(Math.ceil(totalItems / itemsPerPage));
-      return;
-    }
-
+  const fetchGroups = async () => {
     setLoading(true);
     try {
-      const response = await communityGroupService.getCommunityGroups(token, page, itemsPerPage);
-      setGroups(response.data || response);
-      setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
+      let allData = [];
+      if (!token) {
+        allData = mockGroups;
+      } else {
+        const response = await communityGroupService.getCommunityGroups(token);
+        // If API returns paginated data (data + total), extract data; else, use as array
+        if (response && Array.isArray(response.data) && typeof response.total === 'number') {
+          allData = response.data;
+        } else if (Array.isArray(response)) {
+          allData = response;
+        } else {
+          allData = mockGroups;
+        }
+      }
+      setAllGroups(allData);
+      // Slice for current page
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      setGroups(allData.slice(startIndex, endIndex));
+      setTotalPages(Math.ceil(allData.length / itemsPerPage));
     } catch (error) {
       console.error('Error fetching community groups:', error);
-      // Fallback to mock data
-      const totalItems = mockGroups.length;
-      const startIndex = (page - 1) * itemsPerPage;
+      setAllGroups(mockGroups);
+      const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockGroups.slice(startIndex, endIndex);
-      
-      setGroups(paginatedData);
-      setTotalPages(Math.ceil(totalItems / itemsPerPage));
-      
+      setGroups(mockGroups.slice(startIndex, endIndex));
+      setTotalPages(Math.ceil(mockGroups.length / itemsPerPage));
       toast({
         title: "Error",
         description: "Failed to load community groups, showing sample data",
@@ -86,8 +88,16 @@ const CommunityGroups = () => {
   };
 
   useEffect(() => {
-    fetchGroups(currentPage);
-  }, [currentPage, token]);
+    fetchGroups();
+    // eslint-disable-next-line
+  }, [token]);
+
+  useEffect(() => {
+    // Slice allGroups for the current page whenever currentPage or allGroups changes
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setGroups(allGroups.slice(startIndex, endIndex));
+  }, [currentPage, allGroups]);
 
   const handleAddGroup = () => {
     setFormData({
@@ -113,6 +123,41 @@ const CommunityGroups = () => {
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
+
+  // Helper function for mm-dd-yyyy date format
+  function formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'N/A';
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${mm}-${dd}-${yyyy}`;
+  }
+
+  function getPaginationRange(current, total) {
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+    let l;
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+        range.push(i);
+      }
+    }
+    for (let i of range) {
+      if (l) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l > 2) {
+          rangeWithDots.push('...');
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    }
+    return rangeWithDots;
+  }
 
   return (
     <div className="space-y-6">
@@ -164,8 +209,8 @@ const CommunityGroups = () => {
                     <TableCell className="text-blue-600 hover:underline cursor-pointer">
                       {group.name}
                     </TableCell>
-                    <TableCell>{group.lastUpdated}</TableCell>
-                    <TableCell>{group.created}</TableCell>
+                    <TableCell>{formatDate(group.updatedAt || group.lastUpdated)}</TableCell>
+                    <TableCell>{formatDate(group.createdAt || group.created)}</TableCell>
                     <TableCell>
                       <button 
                         className="p-1 hover:bg-gray-100 rounded"
@@ -191,20 +236,25 @@ const CommunityGroups = () => {
                       className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                     />
                   </PaginationItem>
-                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                    const page = i + 1;
-                    return (
-                      <PaginationItem key={page}>
-                        <PaginationLink
-                          onClick={() => handlePageChange(page)}
-                          isActive={currentPage === page}
-                          className="cursor-pointer"
-                        >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
+                  {getPaginationRange(currentPage, totalPages).map((page, idx) =>
+                    page === '...'
+                      ? (
+                        <PaginationItem key={"ellipsis-" + idx}>
+                          <span className="px-2">...</span>
+                        </PaginationItem>
+                      )
+                      : (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => handlePageChange(page)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )
+                  )}
                   <PaginationItem>
                     <PaginationNext 
                       onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}

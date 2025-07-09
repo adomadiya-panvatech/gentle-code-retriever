@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { PanelLeft } from "lucide-react"
+import { PanelLeft, X } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -196,7 +196,7 @@ const Sidebar = React.forwardRef<
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden relative"
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -204,6 +204,14 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
+            {/* Close (cross) icon for mobile */}
+            <button
+              className="absolute top-3 right-3 z-50 p-2 rounded-full hover:bg-gray-200 focus:outline-none md:hidden"
+              onClick={() => setOpenMobile(false)}
+              aria-label="Close sidebar"
+            >
+              <X className="w-6 h-6" />
+            </button>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>

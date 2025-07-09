@@ -9,6 +9,8 @@ import NewGuidanceRuleDialog from '../components/GuidanceRules/NewGuidanceRuleDi
 import EditGuidanceRuleDialog from '../components/GuidanceRules/EditGuidanceRuleDialog';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/use-toast';
+import { Eye, Pencil } from 'lucide-react';
+import ViewModal from '../components/Modals/ViewModal';
 
 const GuidanceRules = () => {
   const { token } = useAuth();
@@ -19,9 +21,17 @@ const GuidanceRules = () => {
   const [selectedRule, setSelectedRule] = useState(null);
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentTab, setCurrentTab] = useState('daily-checkup');
+  const [tabPage, setTabPage] = useState({
+    'daily-checkup': 1,
+    'time-slot': 1,
+    'scheduled': 1,
+    'usage-event': 1,
+  });
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingRule, setViewingRule] = useState(null);
 
   // Mock data for demonstration
   const mockRules = [
@@ -90,8 +100,8 @@ const GuidanceRules = () => {
   };
 
   useEffect(() => {
-    fetchRules(currentPage);
-  }, [currentPage, token]);
+    fetchRules(currentTab === 'daily-checkup' ? tabPage['daily-checkup'] : currentTab === 'time-slot' ? tabPage['time-slot'] : currentTab === 'scheduled' ? tabPage['scheduled'] : tabPage['usage-event']);
+  }, [currentTab, tabPage, token]);
 
   const handleCheckboxChange = (checked: boolean | "indeterminate") => {
     if (typeof checked === 'boolean') {
@@ -104,9 +114,48 @@ const GuidanceRules = () => {
     setShowEditDialog(true);
   };
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+  const handleTabChange = (tab) => {
+    setCurrentTab(tab);
   };
+
+  const handleTabPageChange = (tab, page) => {
+    setTabPage(prev => ({ ...prev, [tab]: page }));
+  };
+
+  // Helper function for mm-dd-yyyy date format
+  function formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'N/A';
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${mm}-${dd}-${yyyy}`;
+  }
+
+  const tabStatusMap = {
+    'daily-checkup': 'Daily Checkup',
+    'time-slot': 'Time Slot',
+    'scheduled': 'Scheduled',
+    'usage-event': 'Usage Event',
+  };
+
+  function getFilteredRules(tab) {
+    return rules.filter(rule => rule.status === tabStatusMap[tab]);
+  }
+
+  function getPaginatedRules(tab) {
+    const filtered = getFilteredRules(tab);
+    const page = tabPage[tab] || 1;
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filtered.slice(startIndex, endIndex);
+  }
+
+  function getTotalPages(tab) {
+    const filtered = getFilteredRules(tab);
+    return Math.ceil(filtered.length / itemsPerPage) || 1;
+  }
 
   return (
     <div className="space-y-6">
@@ -120,7 +169,7 @@ const GuidanceRules = () => {
         </Button>
       </div>
 
-      <Tabs defaultValue="daily-checkup" className="w-full">
+      <Tabs defaultValue="daily-checkup" className="w-full" onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-4 max-w-2xl">
           <TabsTrigger value="time-slot">Time Slot</TabsTrigger>
           <TabsTrigger value="daily-checkup">Daily Checkup</TabsTrigger>
@@ -136,135 +185,132 @@ const GuidanceRules = () => {
           <label className="text-sm">Hide Expired</label>
         </div>
 
-        <TabsContent value="daily-checkup" className="space-y-4">
-          <Card className="border-gray-200">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-b border-gray-200">
-                    <TableHead className="font-semibold text-gray-900">Rule Name</TableHead>
-                    <TableHead className="font-semibold text-gray-900">Updated</TableHead>
-                    <TableHead className="font-semibold text-gray-900">State</TableHead>
-                    <TableHead className="font-semibold text-gray-900 text-center">
-                      <div className="flex flex-col">
-                        <span>1 condition</span>
-                      </div>
-                    </TableHead>
-                    <TableHead className="font-semibold text-gray-900 text-center">
-                      <div className="flex flex-col">
-                        <span>1 action</span>
-                      </div>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="p-8 text-center text-gray-500">
-                        Loading guidance rules...
-                      </TableCell>
+        {['daily-checkup', 'time-slot', 'scheduled', 'usage-event'].map(tab => (
+          <TabsContent value={tab} className="space-y-4" key={tab}>
+            <Card className="border-gray-200">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-gray-200">
+                      <TableHead className="font-semibold text-gray-900">Rule Name</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Updated</TableHead>
+                      <TableHead className="font-semibold text-gray-900">State</TableHead>
+                      <TableHead className="font-semibold text-gray-900 text-center">
+                        <div className="flex flex-col">
+                          <span>condition</span>
+                        </div>
+                      </TableHead>
+                      <TableHead className="font-semibold text-gray-900 text-center">
+                        <div className="flex flex-col">
+                          <span>action</span>
+                        </div>
+                      </TableHead>
                     </TableRow>
-                  ) : rules.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="p-8 text-center text-gray-500">
-                        No guidance rules found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    rules.map((rule) => (
-                      <TableRow key={rule.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <TableCell>
-                          <span 
-                            className="text-blue-600 hover:underline cursor-pointer"
-                            onClick={() => handleRuleClick(rule)}
-                          >
-                            {rule.name}
-                          </span>
-                        </TableCell>
-                        <TableCell>{rule.updated}</TableCell>
-                        <TableCell>
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            rule.state === 'Active' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {rule.state}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="text-blue-600">{rule.conditions} condition</span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="text-blue-600">{rule.actions} action{rule.actions > 1 ? 's' : ''}</span>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="p-8 text-center text-gray-500">
+                          Loading guidance rules...
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="p-4 border-t">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious 
-                          onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
-                          className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                        />
-                      </PaginationItem>
-                      {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                        const page = i + 1;
-                        return (
-                          <PaginationItem key={page}>
-                            <PaginationLink
-                              onClick={() => handlePageChange(page)}
-                              isActive={currentPage === page}
-                              className="cursor-pointer"
+                    ) : getFilteredRules(tab).length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="p-8 text-center text-gray-500">
+                          No guidance rules found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      getPaginatedRules(tab).map((rule) => (
+                        <TableRow key={rule.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <TableCell>
+                            <span 
+                              className="text-blue-600 hover:underline cursor-pointer"
+                              onClick={() => handleRuleClick(rule)}
                             >
-                              {page}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      })}
-                      <PaginationItem>
-                        <PaginationNext 
-                          onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
-                          className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="time-slot">
-          <Card className="border-gray-200">
-            <CardContent className="p-12 text-center">
-              <p className="text-gray-500">No time slot rules</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="scheduled">
-          <Card className="border-gray-200">
-            <CardContent className="p-12 text-center">
-              <p className="text-gray-500">No scheduled rules</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="usage-event">
-          <Card className="border-gray-200">
-            <CardContent className="p-12 text-center">
-              <p className="text-gray-500">No usage event rules</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                              {rule.rule_name}
+                            </span>
+                          </TableCell>
+                          <TableCell>{formatDate(rule.updatedAt || rule.updated)}</TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              rule.state === 'active' 
+                                ? 'bg-green-100 text-green-800' 
+                                : rule.state === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {rule.state}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-blue-600">{Object.keys(rule.conditions || {}).length} condition</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                className="p-1 hover:bg-gray-100 rounded"
+                                onClick={() => {
+                                  setViewingRule(rule);
+                                  setShowViewModal(true);
+                                }}
+                                title="View"
+                              >
+                                <Eye className="w-4 h-4 text-gray-500" />
+                              </button>
+                              <button
+                                className="p-1 hover:bg-gray-100 rounded"
+                                onClick={() => handleRuleClick(rule)}
+                                title="Edit"
+                              >
+                                <Pencil className="w-4 h-4 text-gray-500" />
+                              </button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+                {/* Pagination */}
+                {getTotalPages(tab) > 1 && (
+                  <div className="p-4 border-t">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            onClick={() => tabPage[tab] > 1 && handleTabPageChange(tab, tabPage[tab] - 1)}
+                            className={tabPage[tab] === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                          />
+                        </PaginationItem>
+                        {[...Array(Math.min(5, getTotalPages(tab)))].map((_, i) => {
+                          const page = i + 1;
+                          return (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => handleTabPageChange(tab, page)}
+                                isActive={tabPage[tab] === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        })}
+                        <PaginationItem>
+                          <PaginationNext 
+                            onClick={() => tabPage[tab] < getTotalPages(tab) && handleTabPageChange(tab, tabPage[tab] + 1)}
+                            className={tabPage[tab] === getTotalPages(tab) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
       </Tabs>
 
       <NewGuidanceRuleDialog
@@ -275,6 +321,16 @@ const GuidanceRules = () => {
         open={showEditDialog} 
         onOpenChange={setShowEditDialog}
         rule={selectedRule}
+      />
+      <ViewModal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setViewingRule(null);
+        }}
+        title="View Guidance Rule"
+        data={viewingRule}
+        type="guidance-rule"
       />
     </div>
   );

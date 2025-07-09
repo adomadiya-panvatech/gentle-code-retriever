@@ -172,7 +172,7 @@ const GoalCategories = () => {
   ];
 
   const handleEdit = (category: any) => {
-    setEditingCategory(category);
+    setEditingCategory({ ...category, title: category.name });
     setIsFormOpen(true);
   };
 
@@ -272,7 +272,7 @@ const GoalCategories = () => {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell>{category.goalTemplates}</TableCell>
+                    <TableCell>{Array.isArray(category.goalTemplates) ? category.goalTemplates.length : 0}</TableCell>
                     <TableCell>{category.filters}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">

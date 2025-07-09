@@ -20,9 +20,9 @@ const Companies = () => {
   const [companyCode, setCompanyCode] = useState('');
   const [statsReport, setStatsReport] = useState(false);
   const [companies, setCompanies] = useState([]);
+  const [allCompanies, setAllCompanies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
   // Mock data for demonstration
@@ -49,35 +49,31 @@ const Companies = () => {
     { name: 'Global Wellness Inc', created: '2019/04/15' }
   ];
 
-  const fetchCompanies = async (page = 1) => {
-    if (!token) {
-      // Use mock data when no token
-      const totalItems = mockCompanies.length;
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockCompanies.slice(startIndex, endIndex);
-      
-      setCompanies(paginatedData);
-      setTotalPages(Math.ceil(totalItems / itemsPerPage));
-      return;
-    }
-
+  const fetchCompanies = async () => {
     setLoading(true);
     try {
-      const response = await companyService.getCompanies(token);
-      setCompanies(response.data || response);
-      setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
-    } catch (error) {
-      console.error('Error fetching companies:', error);
-      // Fallback to mock data
-      const totalItems = mockCompanies.length;
-      const startIndex = (page - 1) * itemsPerPage;
+      let allData = [];
+      if (!token) {
+        allData = mockCompanies;
+      } else {
+        const response = await companyService.getCompanies(token);
+        if (Array.isArray(response.data)) {
+          allData = response.data;
+        } else if (Array.isArray(response)) {
+          allData = response;
+        } else {
+          allData = mockCompanies;
+        }
+      }
+      setAllCompanies(allData);
+      const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockCompanies.slice(startIndex, endIndex);
-      
-      setCompanies(paginatedData);
-      setTotalPages(Math.ceil(totalItems / itemsPerPage));
-      
+      setCompanies(allData.slice(startIndex, endIndex));
+    } catch (error) {
+      setAllCompanies(mockCompanies);
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      setCompanies(mockCompanies.slice(startIndex, endIndex));
       toast({
         title: "Error",
         description: "Failed to load companies, showing sample data",
@@ -89,8 +85,15 @@ const Companies = () => {
   };
 
   useEffect(() => {
-    fetchCompanies(currentPage);
-  }, [currentPage, token]);
+    fetchCompanies();
+    // eslint-disable-next-line
+  }, [token]);
+
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setCompanies(allCompanies.slice(startIndex, endIndex));
+  }, [currentPage, allCompanies]);
 
   const handleCreateCompany = () => {
     console.log('Creating company:', { companyName, companyCode, statsReport });
@@ -109,6 +112,43 @@ const Companies = () => {
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
+
+  // Helper function for mm-dd-yyyy date format
+  function formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'N/A';
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${mm}-${dd}-${yyyy}`;
+  }
+
+  function getPaginationRange(current, total) {
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+    let l;
+
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+        range.push(i);
+      }
+    }
+
+    for (let i of range) {
+      if (l) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l > 2) {
+          rangeWithDots.push('...');
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    }
+    return rangeWithDots;
+  }
 
   return (
     <div className="space-y-6">
@@ -149,7 +189,7 @@ const Companies = () => {
                 companies.map((company, index) => (
                   <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
                     <TableCell className="font-medium">{company.name}</TableCell>
-                    <TableCell className="text-gray-600">{company.created}</TableCell>
+                    <TableCell className="text-gray-600">{formatDate(company.createdAt || company.created)}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -157,7 +197,7 @@ const Companies = () => {
           </Table>
 
           {/* Pagination */}
-          {totalPages > 1 && (
+          {allCompanies.length > itemsPerPage && (
             <div className="p-4 border-t">
               <Pagination>
                 <PaginationContent>
@@ -167,24 +207,29 @@ const Companies = () => {
                       className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                     />
                   </PaginationItem>
-                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                    const page = i + 1;
-                    return (
-                      <PaginationItem key={page}>
-                        <PaginationLink
-                          onClick={() => handlePageChange(page)}
-                          isActive={currentPage === page}
-                          className="cursor-pointer"
-                        >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
+                  {getPaginationRange(currentPage, Math.ceil(allCompanies.length / itemsPerPage)).map((page, idx) =>
+                    page === '...'
+                      ? (
+                        <PaginationItem key={"ellipsis-" + idx}>
+                          <span className="px-2">...</span>
+                        </PaginationItem>
+                      )
+                      : (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => handlePageChange(page)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )
+                  )}
                   <PaginationItem>
                     <PaginationNext 
-                      onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
-                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      onClick={() => currentPage < Math.ceil(allCompanies.length / itemsPerPage) && handlePageChange(currentPage + 1)}
+                      className={currentPage === Math.ceil(allCompanies.length / itemsPerPage) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                     />
                   </PaginationItem>
                 </PaginationContent>

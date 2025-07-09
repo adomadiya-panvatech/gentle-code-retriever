@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 const API_URL = 'http://localhost:3000/api/content';
 
@@ -20,3 +19,8 @@ export const updateContent = async (id: string, content: any, token: string) =>
 
 export const deleteContent = async (id: string, token: string) =>
   (await axios.delete(`${API_URL}/${id}`, { headers: { Authorization: `Bearer ${token}` } })).data;
+
+export const getAllContentForLibrary = async (token: string) =>
+  (await axios.get('http://localhost:3000/api/all-content/content-library', {
+    headers: { Authorization: `Bearer ${token}` }
+  })).data;

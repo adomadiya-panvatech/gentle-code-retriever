@@ -7,6 +7,9 @@ import { Plus, Tags, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/use-toast';
 import * as taxonomyService from '../services/taxonomyService';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 
 const Taxonomy = () => {
   const [editingTaxonomy, setEditingTaxonomy] = useState(null);
@@ -15,6 +18,7 @@ const Taxonomy = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
+  const [showForm, setShowForm] = useState(false);
 
   const { user } = useAuth();
   const { toast } = useToast();
@@ -40,43 +44,33 @@ const Taxonomy = () => {
   ];
 
   const fetchTaxonomies = async (page = 1) => {
+    let allTaxonomies = [];
     if (!token) {
-      // Use mock data when no token
-      const totalMockItems = mockTaxonomies.length;
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockTaxonomies.slice(startIndex, endIndex);
-      
-      setTaxonomies(paginatedData);
-      setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
-      return;
+      allTaxonomies = mockTaxonomies;
+    } else {
+      setLoading(true);
+      try {
+        const response = await taxonomyService.getTaxonomies(token);
+        allTaxonomies = response.data || response;
+      } catch (error) {
+        console.error('Error fetching taxonomies:', error);
+        allTaxonomies = mockTaxonomies;
+        toast({
+          title: "Error",
+          description: "Failed to fetch taxonomies, showing sample data",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
     }
-
-    setLoading(true);
-    try {
-      const response = await taxonomyService.getTaxonomies(token, page, itemsPerPage);
-      console.log('Taxonomies response:', response);
-      setTaxonomies(response.data || response);
-      setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
-    } catch (error) {
-      console.error('Error fetching taxonomies:', error);
-      // Fallback to mock data on error
-      const totalMockItems = mockTaxonomies.length;
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockTaxonomies.slice(startIndex, endIndex);
-      
-      setTaxonomies(paginatedData);
-      setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
-      
-      toast({
-        title: "Error",
-        description: "Failed to fetch taxonomies, showing sample data",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    allTaxonomies.sort((a, b) => new Date(b.created_at || b.createdAt).getTime() - new Date(a.created_at || a.createdAt).getTime());
+    const totalMockItems = allTaxonomies.length;
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = allTaxonomies.slice(startIndex, endIndex);
+    setTaxonomies(paginatedData);
+    setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
   };
 
   useEffect(() => {
@@ -85,12 +79,7 @@ const Taxonomy = () => {
 
   const handleEdit = (taxonomy: any) => {
     setEditingTaxonomy(taxonomy);
-    toast({
-      title: "Edit Taxonomy",
-      description: `Opening edit form for ${taxonomy.name}`,
-    });
-    // Here you would open an edit modal/form
-    console.log('Editing taxonomy:', taxonomy);
+    setShowForm(true);
   };
 
   const handleDelete = (taxonomy: any) => {
@@ -106,12 +95,81 @@ const Taxonomy = () => {
     setCurrentPage(page);
   };
 
+  const handleFormClose = () => {
+    setShowForm(false);
+    setEditingTaxonomy(null);
+  };
+
+  const handleFormSave = async (data: any) => {
+    try {
+      if (data.id) {
+        // Edit existing taxonomy
+        await taxonomyService.updateTaxonomy(data.id, { name: data.name, description: data.description }, token);
+        toast({
+          title: 'Updated',
+          description: `Taxonomy "${data.name}" updated!`,
+        });
+      } else {
+        // Create new taxonomy
+        await taxonomyService.createTaxonomy({ name: data.name, description: data.description }, token);
+        toast({
+          title: 'Created',
+          description: `Taxonomy "${data.name}" created!`,
+        });
+      }
+      setShowForm(false);
+      setEditingTaxonomy(null);
+      fetchTaxonomies(currentPage);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save taxonomy.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Helper function for mm-dd-yyyy date format
+  function formatDate(dateStr: string | Date | undefined): string {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'N/A';
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${mm}-${dd}-${yyyy}`;
+  }
+
+  function getPaginationRange(current, total) {
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+    let l;
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+        range.push(i);
+      }
+    }
+    for (let i of range) {
+      if (l) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l > 2) {
+          rangeWithDots.push('...');
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    }
+    return rangeWithDots;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-black">Taxonomy</h1>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white text-sm">
+        <Button className="bg-blue-600 hover:bg-blue-700 text-white text-sm" onClick={() => { setEditingTaxonomy(null); setShowForm(true); }}>
           Usage Metrics
         </Button>
       </div>
@@ -120,7 +178,7 @@ const Taxonomy = () => {
       <Card className="border-gray-200">
         <CardContent className="p-6">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+            <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center cursor-pointer" onClick={() => { setEditingTaxonomy(null); setShowForm(true); }}>
               <Plus className="w-6 h-6 text-gray-600" />
             </div>
             <div className="flex-1">
@@ -145,7 +203,7 @@ const Taxonomy = () => {
                 <p className="text-gray-500 mb-4">
                   Start organizing your content by creating taxonomy categories
                 </p>
-                <Button className="bg-black text-white hover:bg-gray-800">
+                <Button className="bg-black text-white hover:bg-gray-800" onClick={() => { setEditingTaxonomy(null); setShowForm(true); }}>
                   <Plus className="w-4 h-4 mr-2" />
                   Create First Category
                 </Button>
@@ -167,7 +225,7 @@ const Taxonomy = () => {
                     <TableRow key={taxonomy.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <TableCell>{taxonomy.name || taxonomy.title}</TableCell>
                       <TableCell>{taxonomy.description || 'No description'}</TableCell>
-                      <TableCell>{taxonomy.created_at || taxonomy.createdAt}</TableCell>
+                      <TableCell>{formatDate(taxonomy.created_at || taxonomy.createdAt)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Button 
@@ -204,20 +262,25 @@ const Taxonomy = () => {
                           className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         />
                       </PaginationItem>
-                      {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                        const page = i + 1;
-                        return (
-                          <PaginationItem key={page}>
-                            <PaginationLink
-                              onClick={() => handlePageChange(page)}
-                              isActive={currentPage === page}
-                              className="cursor-pointer"
-                            >
-                              {page}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      })}
+                      {getPaginationRange(currentPage, totalPages).map((page, idx) =>
+                        page === '...'
+                          ? (
+                            <PaginationItem key={"ellipsis-" + idx}>
+                              <span className="px-2">...</span>
+                            </PaginationItem>
+                          )
+                          : (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => handlePageChange(page)}
+                                isActive={currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          )
+                      )}
                       <PaginationItem>
                         <PaginationNext 
                           onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
@@ -232,7 +295,54 @@ const Taxonomy = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Taxonomy Edit/Create Modal */}
+      <TaxonomyForm
+        open={showForm}
+        onClose={handleFormClose}
+        taxonomy={editingTaxonomy}
+        onSave={handleFormSave}
+      />
     </div>
+  );
+};
+
+const TaxonomyForm = ({ open, onClose, taxonomy, onSave }: { open: boolean, onClose: () => void, taxonomy: any, onSave: (data: any) => void }) => {
+  const [name, setName] = useState(taxonomy?.name || '');
+  const [description, setDescription] = useState(taxonomy?.description || '');
+
+  useEffect(() => {
+    setName(taxonomy?.name || '');
+    setDescription(taxonomy?.description || '');
+  }, [taxonomy]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({ ...taxonomy, name, description });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{taxonomy ? 'Edit Taxonomy' : 'Add Taxonomy'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label>Name</Label>
+            <Input value={name} onChange={e => setName(e.target.value)} required />
+          </div>
+          <div>
+            <Label>Description</Label>
+            <Input value={description} onChange={e => setDescription(e.target.value)} />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit">Save</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
 

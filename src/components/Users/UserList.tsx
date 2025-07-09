@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { userService } from '../../services/userService';
@@ -14,6 +13,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../ui/pagination';
 import { Trash2, Edit, UserX, Search, Plus } from 'lucide-react';
 import { useToast } from '../../hooks/use-toast';
+
+function getPaginationRange(current, total) {
+  const delta = 2;
+  const range = [];
+  const rangeWithDots = [];
+  let l;
+  for (let i = 1; i <= total; i++) {
+    if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+      range.push(i);
+    }
+  }
+  for (let i of range) {
+    if (l) {
+      if (i - l === 2) {
+        rangeWithDots.push(l + 1);
+      } else if (i - l > 2) {
+        rangeWithDots.push('...');
+      }
+    }
+    rangeWithDots.push(i);
+    l = i;
+  }
+  return rangeWithDots;
+}
 
 const UserList = () => {
   const { user, token } = useAuth();
@@ -283,7 +306,7 @@ const UserList = () => {
           </div>
 
           {/* Pagination */}
-          {calculatedTotalPages > 1 && (
+          {totalPages > 1 && (
             <div className="p-4 border-t">
               <Pagination>
                 <PaginationContent>
@@ -293,24 +316,29 @@ const UserList = () => {
                       className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                     />
                   </PaginationItem>
-                  {[...Array(Math.min(5, calculatedTotalPages))].map((_, i) => {
-                    const page = i + 1;
-                    return (
-                      <PaginationItem key={page}>
-                        <PaginationLink
-                          onClick={() => handlePageChange(page)}
-                          isActive={currentPage === page}
-                          className="cursor-pointer"
-                        >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
+                  {getPaginationRange(currentPage, totalPages).map((page, idx) =>
+                    page === '...'
+                      ? (
+                        <PaginationItem key={"ellipsis-" + idx}>
+                          <span className="px-2">...</span>
+                        </PaginationItem>
+                      )
+                      : (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => handlePageChange(page)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )
+                  )}
                   <PaginationItem>
                     <PaginationNext 
-                      onClick={() => currentPage < calculatedTotalPages && handlePageChange(currentPage + 1)}
-                      className={currentPage === calculatedTotalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                     />
                   </PaginationItem>
                 </PaginationContent>

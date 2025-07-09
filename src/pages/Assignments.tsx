@@ -10,6 +10,43 @@ import { Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { assignmentService } from '../services/assignmentService';
 import { useToast } from '../hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
+
+// Helper function for mm-dd-yyyy date format
+function formatDate(dateStr: string | Date | undefined): string {
+  if (!dateStr) return 'N/A';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 'N/A';
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${mm}-${dd}-${yyyy}`;
+}
+
+function getPaginationRange(current, total) {
+  const delta = 2;
+  const range = [];
+  const rangeWithDots = [];
+  let l;
+  for (let i = 1; i <= total; i++) {
+    if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+      range.push(i);
+    }
+  }
+  for (let i of range) {
+    if (l) {
+      if (i - l === 2) {
+        rangeWithDots.push(l + 1);
+      } else if (i - l > 2) {
+        rangeWithDots.push('...');
+      }
+    }
+    rangeWithDots.push(i);
+    l = i;
+  }
+  return rangeWithDots;
+}
 
 const Assignments = () => {
   const { token } = useAuth();
@@ -19,9 +56,14 @@ const Assignments = () => {
   const [viewingAssignment, setViewingAssignment] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const tabKeys = ['templates', 'pending', 'viewed', 'started', 'completed', 'skipped'];
+  const [currentPage, setCurrentPage] = useState(() => Object.fromEntries(tabKeys.map(tab => [tab, 1])));
+  const [totalPages, setTotalPages] = useState(() => Object.fromEntries(tabKeys.map(tab => [tab, 1])));
   const itemsPerPage = 10;
+  const [activeTab, setActiveTab] = useState('templates');
+  const [allAssignments, setAllAssignments] = useState(() => Object.fromEntries(tabKeys.map(tab => [tab, []])));
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState(null);
 
   // Mock data for demonstration
   const mockAssignments = [
@@ -42,48 +84,44 @@ const Assignments = () => {
     { user: 'emilywhite@example.com', type: 'goal', scheduled: 'Nov 5, 2022 3:20:00 PM', expiry: 'Nov 12, 2022 3:20:00 PM' }
   ];
 
-  const fetchAssignments = async (page = 1) => {
+  const fetchAssignments = async (page = 1, status = activeTab) => {
+    let allData = [];
     if (!token) {
-      // Use mock data when no token
-      const totalItems = mockAssignments.length;
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockAssignments.slice(startIndex, endIndex);
-      
-      setAssignments(paginatedData);
-      setTotalPages(Math.ceil(totalItems / itemsPerPage));
-      return;
+      allData = mockAssignments;
+    } else {
+      setLoading(true);
+      try {
+        let response;
+        if (status === 'templates') {
+          response = await assignmentService.getAssignments(token);
+        } else {
+          response = await assignmentService.getAssignmentsByStatus(token, status);
+        }
+        allData = response.data || response;
+      } catch (error) {
+        console.error('Error fetching assignments:', error);
+        allData = mockAssignments;
+        toast({
+          title: "Error",
+          description: "Failed to load assignments, showing sample data",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
     }
-
-    setLoading(true);
-    try {
-      const response = await assignmentService.getAssignments(token, page, itemsPerPage);
-      setAssignments(response.data || response);
-      setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
-    } catch (error) {
-      console.error('Error fetching assignments:', error);
-      // Fallback to mock data
-      const totalItems = mockAssignments.length;
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockAssignments.slice(startIndex, endIndex);
-      
-      setAssignments(paginatedData);
-      setTotalPages(Math.ceil(totalItems / itemsPerPage));
-      
-      toast({
-        title: "Error",
-        description: "Failed to load assignments, showing sample data",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    setAllAssignments(prev => ({ ...prev, [status]: allData }));
+    const totalItems = allData.length;
+    setTotalPages(prev => ({ ...prev, [status]: Math.ceil(totalItems / itemsPerPage) }));
+    // Set paginated assignments for current page
+    const startIndex = (currentPage[status] - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setAssignments(allData.slice(startIndex, endIndex));
   };
 
   useEffect(() => {
-    fetchAssignments(currentPage);
-  }, [currentPage, token]);
+    fetchAssignments(currentPage[activeTab], activeTab);
+  }, [currentPage, token, activeTab]);
 
   const handleCheckboxChange = (checked: boolean | "indeterminate") => {
     if (typeof checked === 'boolean') {
@@ -97,7 +135,44 @@ const Assignments = () => {
   };
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+    setCurrentPage(prev => ({ ...prev, [activeTab]: page }));
+    // Paginate from allAssignments for the current tab
+    const allData = allAssignments[activeTab] || [];
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setAssignments(allData.slice(startIndex, endIndex));
+  };
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setCurrentPage(prev => ({ ...prev, [tab]: 1 }));
+  };
+
+  const handleAdd = () => {
+    setEditingAssignment(null);
+    setIsFormOpen(true);
+  };
+
+  const handleEdit = (assignment: any) => {
+    setEditingAssignment(assignment);
+    setIsFormOpen(true);
+  };
+
+  const handleFormClose = () => {
+    setIsFormOpen(false);
+    setEditingAssignment(null);
+  };
+
+  const handleFormSave = (data: any) => {
+    // Here you would call your API to create or update assignment
+    // For now, just close the modal and show a toast
+    toast({
+      title: 'Saved',
+      description: `Assignment saved!`,
+    });
+    setIsFormOpen(false);
+    setEditingAssignment(null);
+    fetchAssignments(currentPage[activeTab], activeTab);
   };
 
   return (
@@ -112,13 +187,13 @@ const Assignments = () => {
             />
             <label className="text-sm">Show card previews</label>
           </div>
-          <Button className="bg-green-600 hover:bg-green-700 text-white">
+          <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={handleAdd}>
             New Assignment
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="templates" className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="pending">Pending</TabsTrigger>
@@ -159,8 +234,8 @@ const Assignments = () => {
                       <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
                         <TableCell className="text-blue-600">{assignment.username}</TableCell>
                         <TableCell>{assignment.type}</TableCell>
-                        <TableCell>{assignment.scheduled_for}</TableCell>
-                        <TableCell>{assignment.expiry_time}</TableCell>
+                        <TableCell>{formatDate(assignment.scheduled_for)}</TableCell>
+                        <TableCell>{formatDate(assignment.expiry_time)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <button 
@@ -169,7 +244,7 @@ const Assignments = () => {
                             >
                               <Eye className="w-4 h-4 text-gray-500" />
                             </button>
-                            <button className="text-blue-600 hover:underline text-sm">Edit</button>
+                            <button className="text-blue-600 hover:underline text-sm" onClick={() => handleEdit(assignment)}>Edit</button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -179,34 +254,39 @@ const Assignments = () => {
               </Table>
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {totalPages[activeTab] > 1 && (
                 <div className="p-4 border-t">
                   <Pagination>
                     <PaginationContent>
                       <PaginationItem>
                         <PaginationPrevious 
-                          onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
-                          className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                          onClick={() => currentPage[activeTab] > 1 && handlePageChange(currentPage[activeTab] - 1)}
+                          className={currentPage[activeTab] === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         />
                       </PaginationItem>
-                      {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                        const page = i + 1;
-                        return (
-                          <PaginationItem key={page}>
-                            <PaginationLink
-                              onClick={() => handlePageChange(page)}
-                              isActive={currentPage === page}
-                              className="cursor-pointer"
-                            >
-                              {page}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      })}
+                      {getPaginationRange(currentPage[activeTab], totalPages[activeTab]).map((page, idx) =>
+                        page === '...'
+                          ? (
+                            <PaginationItem key={"ellipsis-" + idx}>
+                              <span className="px-2">...</span>
+                            </PaginationItem>
+                          )
+                          : (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => handlePageChange(page)}
+                                isActive={currentPage[activeTab] === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          )
+                      )}
                       <PaginationItem>
                         <PaginationNext 
-                          onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
-                          className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                          onClick={() => currentPage[activeTab] < totalPages[activeTab] && handlePageChange(currentPage[activeTab] + 1)}
+                          className={currentPage[activeTab] === totalPages[activeTab] ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         />
                       </PaginationItem>
                     </PaginationContent>
@@ -217,45 +297,100 @@ const Assignments = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="pending">
-          <Card className="border-gray-200">
-            <CardContent className="p-12 text-center">
-              <p className="text-gray-500">No pending assignments</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="viewed">
-          <Card className="border-gray-200">
-            <CardContent className="p-12 text-center">
-              <p className="text-gray-500">No viewed assignments</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="started">
-          <Card className="border-gray-200">
-            <CardContent className="p-12 text-center">
-              <p className="text-gray-500">No started assignments</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="completed">
-          <Card className="border-gray-200">
-            <CardContent className="p-12 text-center">
-              <p className="text-gray-500">No completed assignments</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="skipped">
-          <Card className="border-gray-200">
-            <CardContent className="p-12 text-center">
-              <p className="text-gray-500">No skipped assignments</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {['pending', 'viewed', 'started', 'completed', 'skipped'].map(tab => (
+          <TabsContent key={tab} value={tab} className="space-y-4">
+            <Card className="border-gray-200">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-gray-200">
+                      <TableHead className="font-semibold text-gray-900">User</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Type</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Scheduled for (UTC)</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Expiry Time (UTC)</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="p-8 text-center text-gray-500">
+                          Loading assignments...
+                        </TableCell>
+                      </TableRow>
+                    ) : assignments.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="p-8 text-center text-gray-500">
+                          No assignments found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      assignments.map((assignment, index) => (
+                        <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                          <TableCell className="text-blue-600">{assignment.username}</TableCell>
+                          <TableCell>{assignment.type}</TableCell>
+                          <TableCell>{formatDate(assignment.scheduled_for)}</TableCell>
+                          <TableCell>{formatDate(assignment.expiry_time)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                className="p-1 hover:bg-gray-100 rounded"
+                                onClick={() => handleView(assignment)}
+                              >
+                                <Eye className="w-4 h-4 text-gray-500" />
+                              </button>
+                              <button className="text-blue-600 hover:underline text-sm" onClick={() => handleEdit(assignment)}>Edit</button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+                {/* Pagination */}
+                {totalPages[tab] > 1 && (
+                  <div className="p-4 border-t">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            onClick={() => currentPage[tab] > 1 && handlePageChange(currentPage[tab] - 1)}
+                            className={currentPage[tab] === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                          />
+                        </PaginationItem>
+                        {getPaginationRange(currentPage[tab], totalPages[tab]).map((page, idx) =>
+                          page === '...'
+                            ? (
+                              <PaginationItem key={"ellipsis-" + idx}>
+                                <span className="px-2">...</span>
+                              </PaginationItem>
+                            )
+                            : (
+                              <PaginationItem key={page}>
+                                <PaginationLink
+                                  onClick={() => handlePageChange(page)}
+                                  isActive={currentPage[tab] === page}
+                                  className="cursor-pointer"
+                                >
+                                  {page}
+                                </PaginationLink>
+                              </PaginationItem>
+                            )
+                        )}
+                        <PaginationItem>
+                          <PaginationNext 
+                            onClick={() => currentPage[tab] < totalPages[tab] && handlePageChange(currentPage[tab] + 1)}
+                            className={currentPage[tab] === totalPages[tab] ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
       </Tabs>
 
       <ViewModal
@@ -268,7 +403,67 @@ const Assignments = () => {
         data={viewingAssignment}
         type="assignment"
       />
+
+      {/* Assignment Add/Edit Modal */}
+      <AssignmentForm
+        open={isFormOpen}
+        onClose={handleFormClose}
+        assignment={editingAssignment}
+        onSave={handleFormSave}
+      />
     </div>
+  );
+};
+
+const AssignmentForm = ({ open, onClose, assignment, onSave }: { open: boolean, onClose: () => void, assignment: any, onSave: (data: any) => void }) => {
+  const [formData, setFormData] = useState({
+    username: assignment?.username || '',
+    type: assignment?.type || '',
+    scheduled_for: assignment?.scheduled_for || '',
+    expiry_time: assignment?.expiry_time || ''
+  });
+  useEffect(() => {
+    setFormData({
+      username: assignment?.username || '',
+      type: assignment?.type || '',
+      scheduled_for: assignment?.scheduled_for || '',
+      expiry_time: assignment?.expiry_time || ''
+    });
+  }, [assignment]);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{assignment ? 'Edit Assignment' : 'Add Assignment'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">User</label>
+            <Input value={formData.username} onChange={e => setFormData(prev => ({ ...prev, username: e.target.value }))} required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+            <Input value={formData.type} onChange={e => setFormData(prev => ({ ...prev, type: e.target.value }))} required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Scheduled For</label>
+            <Input value={formData.scheduled_for} onChange={e => setFormData(prev => ({ ...prev, scheduled_for: e.target.value }))} required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Expiry Time</label>
+            <Input value={formData.expiry_time} onChange={e => setFormData(prev => ({ ...prev, expiry_time: e.target.value }))} required />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit">Save</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
 

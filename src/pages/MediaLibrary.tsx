@@ -8,7 +8,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { Search, Upload, Trash2, Edit, Eye } from 'lucide-react';
 import ViewModal from '../components/Modals/ViewModal';
 import { useAuth } from '../context/AuthContext';
-import { getVideos } from '../services/videoService';
+import { getMediaLibrarys, createMediaLibrary, deleteMediaLibrary, updateMediaLibrary } from '../services/mediaLibraryService';
 import { useToast } from '../hooks/use-toast';
 
 const MediaLibrary = () => {
@@ -23,6 +23,18 @@ const MediaLibrary = () => {
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [name, setName] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+  const [mediaType, setMediaType] = useState("image"); // Default media type
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingMedia, setEditingMedia] = useState<any>(null);
+  const [editName, setEditName] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editTagInput, setEditTagInput] = useState("");
+  const [editMediaType, setEditMediaType] = useState("image");
+  const [editSelectedFile, setEditSelectedFile] = useState<File | null>(null);
   const itemsPerPage = 12; // Grid layout works better with 12 items
 
   const mockMedia = [
@@ -51,12 +63,12 @@ const MediaLibrary = () => {
         const matchesType = selectedType === 'all' || item.type === selectedType;
         return matchesSearch && matchesType;
       });
-      
+
       const totalItems = filtered.length;
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
       const paginatedData = filtered.slice(startIndex, endIndex);
-      
+
       setMedia(paginatedData);
       setTotalPages(Math.ceil(totalItems / itemsPerPage));
       return;
@@ -64,19 +76,19 @@ const MediaLibrary = () => {
 
     setLoading(true);
     try {
-      const response = await getVideos(token);
+      const response = await getMediaLibrarys(token);
       const allMedia = response.data || response;
       const filtered = allMedia.filter((item: any) => {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesType = selectedType === 'all' || item.type === selectedType;
         return matchesSearch && matchesType;
       });
-      
+
       const totalItems = filtered.length;
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
       const paginatedData = filtered.slice(startIndex, endIndex);
-      
+
       setMedia(paginatedData);
       setTotalPages(Math.ceil(totalItems / itemsPerPage));
     } catch (error) {
@@ -87,15 +99,15 @@ const MediaLibrary = () => {
         const matchesType = selectedType === 'all' || item.type === selectedType;
         return matchesSearch && matchesType;
       });
-      
+
       const totalItems = filtered.length;
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
       const paginatedData = filtered.slice(startIndex, endIndex);
-      
+
       setMedia(paginatedData);
       setTotalPages(Math.ceil(totalItems / itemsPerPage));
-      
+
       toast({
         title: "Error",
         description: "Failed to load media, showing sample data",
@@ -129,6 +141,141 @@ const MediaLibrary = () => {
     setCurrentPage(1);
   };
 
+  const handleUpload = async () => {
+    if (!selectedFiles.length || !token) return;
+
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("media_type", mediaType);
+    tags.forEach((tag) => formData.append("tags[]", tag));
+    formData.append("file", selectedFiles[0]); // only uploading the first file
+
+    try {
+      await createMediaLibrary(formData, token);
+
+      toast({
+        title: "Upload successful",
+        description: `${name} uploaded successfully.`,
+      });
+
+      // Refresh media
+      fetchMedia();
+
+      // Reset fields
+      setSelectedFiles([]);
+      setName("");
+      setTags([]);
+      setTagInput("");
+      setMediaType("image");
+      setIsUploadModalOpen(false);
+    } catch (error: any) {
+      console.error("Upload failed", error);
+      toast({
+        title: "Upload failed",
+        description: error?.response?.data?.message || "Something went wrong",
+        variant: "destructive",
+      });
+    }
+  };
+
+  function ImageWithBuffer({ item }) {
+    const [imageSrc, setImageSrc] = useState(null);
+
+    useEffect(() => {
+      if (item.type === 'image') {
+        if (item.file && item.file.type === 'Buffer' && Array.isArray(item.file.data)) {
+          // Convert Buffer data array to Blob URL
+          const byteArray = new Uint8Array(item.file.data);
+          const blob = new Blob([byteArray], { type: item.mimeType || 'image/png' }); // optionally get mimeType from item or fallback
+          const url = URL.createObjectURL(blob);
+          setImageSrc(url);
+
+          return () => {
+            URL.revokeObjectURL(url); // Cleanup
+          };
+        } else if (item.url) {
+          // Use URL string directly if available
+          setImageSrc(item.url);
+        }
+      }
+    }, [item]);
+
+    if (item.type !== 'image') return null;
+
+    return (
+      <img
+        src={imageSrc}
+        alt={item.name}
+        className="w-full h-full object-cover"
+      />
+    );
+  }
+
+  const handleDelete = async (id: number) => {
+    if (!token) return;
+
+    const confirmed = window.confirm("Are you sure you want to delete this media?");
+    if (!confirmed) return;
+
+    try {
+      await deleteMediaLibrary(id.toString(), token);
+
+      toast({
+        title: "Deleted",
+        description: "Media deleted successfully.",
+        variant: "success",
+      });
+
+      // Refresh media list
+      fetchMedia();
+    } catch (error) {
+      console.error("Delete failed", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete media.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditSave = async () => {
+    if (!editingMedia || !token) return;
+
+    const formData = new FormData();
+    formData.append("name", editName);
+    formData.append("media_type", editMediaType);
+    editTags.forEach(tag => formData.append("tags[]", tag));
+
+    if (editSelectedFile) {
+      formData.append("file", editSelectedFile);
+    }
+
+    try {
+      // Assume you have an updateMediaLibrary API function (similar to createMediaLibrary)
+      await updateMediaLibrary(editingMedia.id, formData, token);
+
+      toast({
+        title: "Update successful",
+        description: `${editName} updated successfully.`,
+      });
+
+      // Refresh media list
+      fetchMedia();
+
+      // Reset and close modal
+      setIsEditModalOpen(false);
+      setEditingMedia(null);
+      setEditSelectedFile(null);
+    } catch (error: any) {
+      console.error("Update failed", error);
+      toast({
+        title: "Update failed",
+        description: error?.response?.data?.message || "Something went wrong",
+        variant: "destructive",
+      });
+    }
+  };
+
   const mediaTypes = ['all', 'image', 'video', 'audio', 'document'];
 
   return (
@@ -136,7 +283,7 @@ const MediaLibrary = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-black">Media Library</h1>
-        <Button 
+        <Button
           onClick={() => setIsUploadModalOpen(true)}
           className="bg-green-600 hover:bg-green-700 text-white"
         >
@@ -163,11 +310,10 @@ const MediaLibrary = () => {
                 <Badge
                   key={type}
                   variant={selectedType === type ? "default" : "secondary"}
-                  className={`cursor-pointer capitalize ${
-                    selectedType === type 
-                      ? 'bg-black text-white' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={`cursor-pointer capitalize ${selectedType === type
+                    ? 'bg-black text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
                   onClick={() => handleTypeChange(type)}
                 >
                   {type}
@@ -188,12 +334,17 @@ const MediaLibrary = () => {
           </div>
         ) : (
           media.map((item) => (
-            <Card key={item.id} className="border-gray-200 hover:shadow-md transition-shadow">
+            <Card
+              key={item.id}
+              className="border-gray-200 rounded-2xl shadow-sm hover:shadow-lg hover:scale-[1.01] transition-transform"
+            >
               <CardContent className="p-4">
                 <div className="space-y-3">
                   <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
                     {item.type === 'image' ? (
-                      <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
+                      <ImageWithBuffer item={item} />
+                    ) : item.type === 'video' && item.poster ? (
+                      <img src={item.poster} alt="Video thumbnail" className="w-full h-full object-cover" />
                     ) : (
                       <div className="text-4xl text-gray-400">
                         {item.type === 'video' && '🎥'}
@@ -204,24 +355,47 @@ const MediaLibrary = () => {
                   </div>
                   <div>
                     <h3 className="font-medium text-sm text-gray-900 truncate">{item.name}</h3>
-                    <p className="text-xs text-gray-500">{item.size}</p>
-                    <Badge variant="outline" className="text-xs mt-1">
-                      {item.type}
-                    </Badge>
+                    <p className="text-xs text-gray-500">{item.size || '—'}</p>
+                    <p className="text-xs text-gray-400 truncate">{item.filename}</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {item.tags && item.tags.map((tag: string) => (
+                        <Badge key={tag} variant="secondary" className="text-xs lowercase">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                   <div className="flex gap-1">
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       className="h-8 w-8 p-0"
                       onClick={() => handleView(item)}
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={() => {
+                        setEditingMedia(item);
+                        setEditName(item.name.replace(/\.[^/.]+$/, "")); // name without extension
+                        setEditTags(item.tags || []);
+                        setEditMediaType(item.type);
+                        setEditSelectedFile(null);
+                        setEditTagInput("");
+                        setIsEditModalOpen(true);
+                      }}
+                    >
                       <Edit className="w-4 h-4" />
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-500">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-red-500"
+                      onClick={() => handleDelete(item.id)}
+                    >
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -238,7 +412,7 @@ const MediaLibrary = () => {
           <Pagination>
             <PaginationContent>
               <PaginationItem>
-                <PaginationPrevious 
+                <PaginationPrevious
                   onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
                   className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
@@ -258,7 +432,7 @@ const MediaLibrary = () => {
                 );
               })}
               <PaginationItem>
-                <PaginationNext 
+                <PaginationNext
                   onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
                   className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
@@ -275,19 +449,186 @@ const MediaLibrary = () => {
             <DialogTitle>Upload Media</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Drag and drop files here or click to browse</p>
-              <input type="file" multiple className="hidden" />
+            {/* Dropzone */}
+            <label htmlFor="file-upload" className="cursor-pointer block">
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">Drag and drop files here or click to browse</p>
+              </div>
+            </label>
+            <input
+              id="file-upload"
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const files = e.target.files ? Array.from(e.target.files) : [];
+                setSelectedFiles(files);
+                if (files.length === 1) setName(files[0].name.replace(/\.[^/.]+$/, ""));
+              }}
+            />
+
+            {/* Name Input */}
+            <input
+              type="text"
+              placeholder="Enter name"
+              className="w-full border rounded p-2"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+
+            {/* Media Type Selector */}
+            <select
+              className="w-full border rounded p-2"
+              value={mediaType}
+              onChange={(e) => setMediaType(e.target.value)}
+            >
+              {mediaTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </option>
+              ))}
+            </select>
+
+            {/* Tag Input */}
+            <div>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {tags.map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className="bg-gray-200 px-2 py-1 rounded text-sm flex items-center"
+                  >
+                    {tag}
+                    <button
+                      className="ml-1 text-red-500"
+                      onClick={() => setTags(tags.filter((_, i) => i !== idx))}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <input
+                type="text"
+                placeholder="Add tag and press Enter"
+                className="w-full border rounded p-2"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && tagInput.trim()) {
+                    setTags([...tags, tagInput.trim()]);
+                    setTagInput("");
+                    e.preventDefault();
+                  }
+                }}
+              />
             </div>
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setIsUploadModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button className="bg-green-600 hover:bg-green-700 text-white">
-                Upload
-              </Button>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setIsUploadModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={handleUpload}
+              disabled={!selectedFiles.length}
+            >
+              Upload
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Media</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Optional: file replace */}
+            <label htmlFor="edit-file-upload" className="cursor-pointer block">
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">Drag and drop or click to replace file (optional)</p>
+              </div>
+            </label>
+            <input
+              id="edit-file-upload"
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files ? e.target.files[0] : null;
+                setEditSelectedFile(file);
+                if (file) setEditName(file.name.replace(/\.[^/.]+$/, ""));
+              }}
+            />
+
+            {/* Name Input */}
+            <input
+              type="text"
+              placeholder="Enter name"
+              className="w-full border rounded p-2"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+            />
+
+            {/* Media Type Selector */}
+            <select
+              className="w-full border rounded p-2"
+              value={editMediaType}
+              onChange={(e) => setEditMediaType(e.target.value)}
+            >
+              {mediaTypes.filter(type => type !== "all").map((type) => (
+                <option key={type} value={type}>
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </option>
+              ))}
+            </select>
+
+            {/* Tag Input */}
+            <div>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {editTags.map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className="bg-gray-200 px-2 py-1 rounded text-sm flex items-center"
+                  >
+                    {tag}
+                    <button
+                      className="ml-1 text-red-500"
+                      onClick={() => setEditTags(editTags.filter((_, i) => i !== idx))}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <input
+                type="text"
+                placeholder="Add tag and press Enter"
+                className="w-full border rounded p-2"
+                value={editTagInput}
+                onChange={(e) => setEditTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && editTagInput.trim()) {
+                    setEditTags([...editTags, editTagInput.trim()]);
+                    setEditTagInput("");
+                    e.preventDefault();
+                  }
+                }}
+              />
             </div>
+          </div>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={handleEditSave}
+            >
+              Save
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

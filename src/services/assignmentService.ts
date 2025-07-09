@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 const API_URL = 'http://localhost:3000/api/assignments';
 
@@ -24,10 +23,21 @@ export const updateAssignment = async (id: string, assignment: any, token: strin
 export const deleteAssignment = async (id: string, token: string) =>
   (await axios.delete(`${API_URL}/${id}`, { headers: { Authorization: `Bearer ${token}` } })).data;
 
+export const getAssignmentsByStatus = async (token: string, status: string, page?: number, limit?: number) => {
+  const params = new URLSearchParams();
+  if (status) params.append('status', status);
+  if (page) params.append('page', page.toString());
+  if (limit) params.append('limit', limit.toString());
+  return (await axios.get(`${API_URL}/by-status?${params}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  })).data;
+};
+
 export const assignmentService = {
   getAssignments,
   getAssignment,
   createAssignment,
   updateAssignment,
-  deleteAssignment
+  deleteAssignment,
+  getAssignmentsByStatus
 };

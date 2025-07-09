@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from './components/ui/toaster';
 import Index from './pages/Index';
 import NotFound from './pages/NotFound';
@@ -25,6 +25,7 @@ import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import Password from './pages/Password';
 import Companies from './pages/Companies';
+import Login from './components/Auth/Login';
 
 function App() {
   return (
@@ -34,7 +35,6 @@ function App() {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            
             {/* CMS Routes */}
             <Route path="/cms/content-library" element={
               <CMSLayout>
@@ -76,7 +76,6 @@ function App() {
                 <Challenges />
               </CMSLayout>
             } />
-            
             {/* Tools Routes */}
             <Route path="/cms/surveys" element={
               <CMSLayout>
@@ -98,7 +97,6 @@ function App() {
                 <CommunityModeration />
               </CMSLayout>
             } />
-            
             {/* Rules Routes */}
             <Route path="/cms/guidance-rules" element={
               <CMSLayout>
@@ -110,7 +108,6 @@ function App() {
                 <PersonalizationRules />
               </CMSLayout>
             } />
-            
             {/* Settings Routes */}
             <Route path="/cms/settings" element={
               <CMSLayout>
@@ -127,20 +124,17 @@ function App() {
                 <Password />
               </CMSLayout>
             } />
-            
             {/* Companies Route */}
             <Route path="/cms/companies" element={
               <CMSLayout>
                 <Companies />
               </CMSLayout>
             } />
-
             <Route path="/cms/users" element={
               <CMSLayout>
                 <UserList />
               </CMSLayout>
             } />
-            
             <Route path="/404" element={<NotFound />} />
             <Route path="*" element={<Navigate to="/404" replace />} />
           </Routes>

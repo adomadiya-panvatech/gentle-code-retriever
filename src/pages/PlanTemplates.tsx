@@ -10,6 +10,41 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/use-toast';
 import * as planService from '../services/planService';
 
+// Helper function for mm-dd-yyyy date format
+function formatDate(dateStr: string | Date | undefined): string {
+  if (!dateStr) return 'N/A';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 'N/A';
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${mm}-${dd}-${yyyy}`;
+}
+
+function getPaginationRange(current, total) {
+  const delta = 2;
+  const range = [];
+  const rangeWithDots = [];
+  let l;
+  for (let i = 1; i <= total; i++) {
+    if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+      range.push(i);
+    }
+  }
+  for (let i of range) {
+    if (l) {
+      if (i - l === 2) {
+        rangeWithDots.push(l + 1);
+      } else if (i - l > 2) {
+        rangeWithDots.push('...');
+      }
+    }
+    rangeWithDots.push(i);
+    l = i;
+  }
+  return rangeWithDots;
+}
+
 const PlanTemplates = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -25,69 +60,29 @@ const PlanTemplates = () => {
   const { toast } = useToast();
   const token = localStorage.getItem('token');
 
-  // Extended mock data for better demonstration
-  const mockTemplates = [
-    { id: 1, name: 'Beginner Wellness Plan', activities: 5, taxonomies: 3, description: 'A starter plan for wellness journey' },
-    { id: 2, name: 'Advanced Fitness Plan', activities: 12, taxonomies: 5, description: 'Comprehensive fitness program' },
-    { id: 3, name: 'Mental Health Focus', activities: 8, taxonomies: 4, description: 'Focus on mental wellness' },
-    { id: 4, name: 'Nutrition Basics', activities: 6, taxonomies: 2, description: 'Basic nutrition guidance' },
-    { id: 5, name: 'Sleep Optimization', activities: 4, taxonomies: 2, description: 'Improve sleep quality' },
-    { id: 6, name: 'Stress Management', activities: 7, taxonomies: 3, description: 'Manage daily stress' },
-    { id: 7, name: 'Work-Life Balance', activities: 9, taxonomies: 4, description: 'Balance professional and personal life' },
-    { id: 8, name: 'Mindfulness Practice', activities: 5, taxonomies: 2, description: 'Daily mindfulness exercises' },
-    { id: 9, name: 'Healthy Habits', activities: 10, taxonomies: 5, description: 'Build lasting healthy habits' },
-    { id: 10, name: 'Exercise Fundamentals', activities: 8, taxonomies: 3, description: 'Basic exercise routines' },
-    { id: 11, name: 'Emotional Wellness', activities: 6, taxonomies: 3, description: 'Emotional health support' },
-    { id: 12, name: 'Social Connection', activities: 4, taxonomies: 2, description: 'Building social relationships' },
-    { id: 13, name: 'Energy Boost', activities: 7, taxonomies: 3, description: 'Natural energy enhancement' },
-    { id: 14, name: 'Productivity Focus', activities: 8, taxonomies: 4, description: 'Increase daily productivity' },
-    { id: 15, name: 'Recovery Plan', activities: 5, taxonomies: 2, description: 'Post-workout recovery' }
-  ];
-
   const fetchTemplates = async (page = 1) => {
-    if (!token) {
-      // Use mock data when no token
-      const totalMockItems = mockTemplates.length;
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockTemplates.slice(startIndex, endIndex);
-      
-      setTemplates(paginatedData);
-      setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
-      return;
-    }
-
+    let allTemplates = [];
     setLoading(true);
     try {
-      const response = await planService.getPlans(token, page, itemsPerPage);
-      console.log('Plan templates response:', response);
-      const allTemplates = response.data || response;
-      const totalItems = allTemplates.length;
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedData = allTemplates.slice(startIndex, endIndex);
-      
-      setTemplates(paginatedData);
-      setTotalPages(Math.ceil(totalItems / itemsPerPage));
+      const response = await planService.getPlans(token);
+      allTemplates = response.data || response;
     } catch (error) {
       console.error('Error fetching plan templates:', error);
-      // Fallback to mock data
-      const totalMockItems = mockTemplates.length;
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedData = mockTemplates.slice(startIndex, endIndex);
-      
-      setTemplates(paginatedData);
-      setTotalPages(Math.ceil(totalMockItems / itemsPerPage));
-      
+      allTemplates = [];
       toast({
         title: "Error",
-        description: "Failed to fetch plan templates, showing sample data",
+        description: "Failed to fetch plan templates.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
+    const totalItems = allTemplates.length;
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = allTemplates.slice(startIndex, endIndex);
+    setTemplates(paginatedData);
+    setTotalPages(Math.ceil(totalItems / itemsPerPage));
   };
 
   useEffect(() => {
@@ -161,8 +156,8 @@ const PlanTemplates = () => {
                             {template.name || template.title}
                           </span>
                         </TableCell>
-                        <TableCell>{template.activities || 0}</TableCell>
-                        <TableCell>{template.taxonomies || 0}</TableCell>
+                        <TableCell>{Array.isArray(template.planned_events) ? template.planned_events.length : 0}</TableCell>
+                        <TableCell>{Array.isArray(template.taxonomy_ids) ? template.taxonomy_ids.length : 0}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <button 
@@ -196,20 +191,25 @@ const PlanTemplates = () => {
                           className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         />
                       </PaginationItem>
-                      {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                        const page = i + 1;
-                        return (
-                          <PaginationItem key={page}>
-                            <PaginationLink
-                              onClick={() => handlePageChange(page)}
-                              isActive={currentPage === page}
-                              className="cursor-pointer"
-                            >
-                              {page}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      })}
+                      {getPaginationRange(currentPage, totalPages).map((page, idx) =>
+                        page === '...'
+                          ? (
+                            <PaginationItem key={"ellipsis-" + idx}>
+                              <span className="px-2">...</span>
+                            </PaginationItem>
+                          )
+                          : (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => handlePageChange(page)}
+                                isActive={currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          )
+                      )}
                       <PaginationItem>
                         <PaginationNext 
                           onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}

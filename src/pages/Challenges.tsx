@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -8,6 +7,17 @@ import ChallengeForm from '../components/Content/ChallengeForm';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/use-toast';
 import * as competitionService from '../services/competitionService';
+
+// Helper function for mm-dd-yyyy date format
+function formatDate(dateStr: string | Date | undefined): string {
+  if (!dateStr) return 'N/A';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 'N/A';
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${mm}-${dd}-${yyyy}`;
+}
 
 const Challenges = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -104,8 +114,8 @@ const Challenges = () => {
                     paginatedChallenges.map((challenge: any) => (
                       <TableRow key={challenge.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <TableCell>{challenge.name || challenge.title}</TableCell>
-                        <TableCell>{challenge.start_date || challenge.created_at}</TableCell>
-                        <TableCell>{challenge.end_date || 'N/A'}</TableCell>
+                        <TableCell>{formatDate(challenge.start_date || challenge.created_at)}</TableCell>
+                        <TableCell>{formatDate(challenge.end_date)}</TableCell>
                         <TableCell>{challenge.participants || 0}</TableCell>
                       </TableRow>
                     ))

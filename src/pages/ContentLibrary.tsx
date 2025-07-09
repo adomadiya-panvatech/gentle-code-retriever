@@ -12,7 +12,6 @@ import HTMLCardForm from '../components/Content/HTMLCardForm';
 import ViewModal from '../components/Modals/ViewModal';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/use-toast';
-import * as tipService from '../services/tipService';
 import * as contentService from '../services/contentService';
 
 const ContentLibrary = () => {
@@ -24,7 +23,6 @@ const ContentLibrary = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [viewingItem, setViewingItem] = useState(null);
-  const [tips, setTips] = useState<any[]>([]);
   const [content, setContent] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -44,29 +42,11 @@ const ContentLibrary = () => {
     { id: 'html-card', label: 'HTML Card', color: 'bg-pink-100 text-pink-800' },
   ];
 
-  const fetchTips = async (page = 1) => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const response = await tipService.getTips(token);
-      setTips(response.data || response);
-    } catch (error) {
-      console.error('Error fetching tips:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch tips",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchContent = async (page = 1) => {
     if (!token) return;
     setLoading(true);
     try {
-      const response = await contentService.getContent(token);
+      const response = await contentService.getAllContentForLibrary(token);
       setContent(response.data || response);
     } catch (error) {
       console.error('Error fetching content:', error);
@@ -81,19 +61,16 @@ const ContentLibrary = () => {
   };
 
   useEffect(() => {
-    fetchTips(currentPage);
     fetchContent(currentPage);
   }, [currentPage, token]);
 
-  // Combine all content items
-  const allContentItems = [
-    ...tips.map(tip => ({ ...tip, type: 'tip' })),
-    ...content.map(item => ({ ...item, type: 'article' }))
-  ];
+  // Use only the new content array for allContentItems
+  const allContentItems = content;
 
+  const normalizeType = (type) => type?.toLowerCase().replace(/[-\s]/g, '');
   const filteredContent = allContentItems.filter(item => {
     const matchesSearch = (item.title || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = selectedType === 'all' || item.type === selectedType;
+    const matchesType = selectedType === 'all' || (item.type && normalizeType(item.type) === normalizeType(selectedType));
     return matchesSearch && matchesType;
   });
 
@@ -139,6 +116,30 @@ const ContentLibrary = () => {
     setCurrentPage(page);
   };
 
+  function getPaginationRange(current, total) {
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+    let l;
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+        range.push(i);
+      }
+    }
+    for (let i of range) {
+      if (l) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l > 2) {
+          rangeWithDots.push('...');
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    }
+    return rangeWithDots;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -159,7 +160,13 @@ const ContentLibrary = () => {
             <Plus className="w-4 h-4 mr-2" />
             Add Content
           </Button>
-          <Button className="bg-green-600 hover:bg-green-700 text-white">
+          <Button 
+            className="bg-green-600 hover:bg-green-700 text-white"
+            onClick={() => {
+              setEditingItem(null);
+              setShowArticleForm(true);
+            }}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Add Wellness Article
           </Button>
@@ -226,7 +233,15 @@ const ContentLibrary = () => {
               <Button variant="outline" className="border-gray-300">
                 Search
               </Button>
-              <Button variant="ghost" className="text-gray-600">
+              <Button 
+                variant="ghost" 
+                className="text-gray-600"
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedType('all');
+                  setCurrentPage(1);
+                }}
+              >
                 Clear
               </Button>
             </div>
@@ -288,7 +303,7 @@ const ContentLibrary = () => {
                           </td>
                           <td className="p-4">
                             <Badge className="bg-gray-100 text-gray-800">
-                              {item.type.toUpperCase()}
+                              {item.type?.toUpperCase()}
                             </Badge>
                           </td>
                           <td className="p-4 text-blue-600 font-medium">{item.title || 'Untitled'}</td>
@@ -297,8 +312,8 @@ const ContentLibrary = () => {
                               {item.status || 'Published'}
                             </Badge>
                           </td>
-                          <td className="p-4 text-gray-600">{item.updated_at || item.created_at || 'Unknown'}</td>
-                          <td className="p-4 text-gray-600">{item.views || 0}</td>
+                          <td className="p-4 text-gray-600">{item.updated ? new Date(item.updated).toLocaleDateString() : 'Unknown'}</td>
+                          <td className="p-4 text-gray-600">{item.views ?? 0}</td>
                         </tr>
                       ))
                     )}
@@ -317,20 +332,25 @@ const ContentLibrary = () => {
                           className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         />
                       </PaginationItem>
-                      {[...Array(Math.min(5, calculatedTotalPages))].map((_, i) => {
-                        const page = i + 1;
-                        return (
-                          <PaginationItem key={page}>
-                            <PaginationLink
-                              onClick={() => handlePageChange(page)}
-                              isActive={currentPage === page}
-                              className="cursor-pointer"
-                            >
-                              {page}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      })}
+                      {getPaginationRange(currentPage, calculatedTotalPages).map((page, idx) =>
+                        page === '...'
+                          ? (
+                            <PaginationItem key={"ellipsis-" + idx}>
+                              <span className="px-2">...</span>
+                            </PaginationItem>
+                          )
+                          : (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => handlePageChange(page)}
+                                isActive={currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          )
+                      )}
                       <PaginationItem>
                         <PaginationNext 
                           onClick={() => currentPage < calculatedTotalPages && handlePageChange(currentPage + 1)}
@@ -358,10 +378,7 @@ const ContentLibrary = () => {
 
       <ArticleForm
         isOpen={showArticleForm}
-        onClose={() => {
-          setShowArticleForm(false);
-          setEditingItem(null);
-        }}
+        onClose={() => setShowArticleForm(false)}
         article={editingItem}
       />
 
@@ -382,7 +399,7 @@ const ContentLibrary = () => {
         }}
         title={`View ${viewingItem?.type || 'Content'}`}
         data={viewingItem}
-        type="content"
+        type={viewingItem?.type || 'content'}
       />
     </div>
   );

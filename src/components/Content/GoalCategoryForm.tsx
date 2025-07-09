@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Input } from '../ui/input';
@@ -22,6 +21,14 @@ const GoalCategoryForm: React.FC<GoalCategoryFormProps> = ({
     description: category?.description || '',
     image: category?.image || null
   });
+
+  useEffect(() => {
+    setFormData({
+      title: category?.title || '',
+      description: category?.description || '',
+      image: category?.image || null
+    });
+  }, [category]);
 
   const handleSave = () => {
     console.log('Saving goal category:', formData);

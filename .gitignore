@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# User uploads
+public/lovable-uploads/
+
+# Bun lock file
+bun.lockb

@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 const API_URL = 'http://localhost:3000/api/taxonomies';
 
@@ -32,3 +31,6 @@ export const getTaxonomyByName = async (name: string, token: string) =>
 
 export const updateTaxonomy = async (id: string, taxonomy: any, token: string) =>
   (await axios.put(`${API_URL}/${id}`, taxonomy, { headers: { Authorization: `Bearer ${token}` } })).data;
+
+export const createTaxonomy = async (taxonomy: any, token: string) =>
+  (await axios.post(`${API_URL}`, taxonomy, { headers: { Authorization: `Bearer ${token}` } })).data;

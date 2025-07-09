@@ -72,6 +72,30 @@ const Surveys = () => {
 
   const totalPages = Math.ceil(filteredSurveys.length / itemsPerPage);
 
+  function getPaginationRange(current, total) {
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+    let l;
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+        range.push(i);
+      }
+    }
+    for (let i of range) {
+      if (l) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l > 2) {
+          rangeWithDots.push('...');
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    }
+    return rangeWithDots;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -164,20 +188,25 @@ const Surveys = () => {
                       className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                     />
                   </PaginationItem>
-                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                    const page = i + 1;
-                    return (
-                      <PaginationItem key={page}>
-                        <PaginationLink
-                          onClick={() => handlePageChange(page)}
-                          isActive={currentPage === page}
-                          className="cursor-pointer"
-                        >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
+                  {getPaginationRange(currentPage, totalPages).map((page, idx) =>
+                    page === '...'
+                      ? (
+                        <PaginationItem key={"ellipsis-" + idx}>
+                          <span className="px-2">...</span>
+                        </PaginationItem>
+                      )
+                      : (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => handlePageChange(page)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )
+                  )}
                   <PaginationItem>
                     <PaginationNext 
                       onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}

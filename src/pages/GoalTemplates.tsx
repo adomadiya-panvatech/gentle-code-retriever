@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -44,51 +43,37 @@ const GoalTemplates = () => {
   ];
 
   const fetchTemplates = async (page = 1) => {
+    let allTemplates = [];
     if (!token) {
-      // Use mock data when no token
-      const filtered = mockTemplates.filter(template =>
-        template.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        template.title?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      const totalItems = filtered.length;
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedData = filtered.slice(startIndex, endIndex);
-      
-      setTemplates(paginatedData);
-      setTotalPages(Math.ceil(totalItems / itemsPerPage));
-      return;
+      allTemplates = mockTemplates;
+    } else {
+      setLoading(true);
+      try {
+        const response = await goalTemplateService.getGoalTemplates(token);
+        allTemplates = response.data || response;
+      } catch (error) {
+        console.error('Error fetching goal templates:', error);
+        allTemplates = mockTemplates;
+        toast({
+          title: "Error",
+          description: "Failed to fetch goal templates, showing sample data",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
     }
-
-    setLoading(true);
-    try {
-      const response = await goalTemplateService.getGoalTemplates(token, page, itemsPerPage);
-      console.log('Goal templates response:', response);
-      setTemplates(response.data || response);
-      setTotalPages(Math.ceil((response.total || response.length) / itemsPerPage));
-    } catch (error) {
-      console.error('Error fetching goal templates:', error);
-      // Fallback to mock data
-      const filtered = mockTemplates.filter(template =>
-        template.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        template.title?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      const totalItems = filtered.length;
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedData = filtered.slice(startIndex, endIndex);
-      
-      setTemplates(paginatedData);
-      setTotalPages(Math.ceil(totalItems / itemsPerPage));
-      
-      toast({
-        title: "Error",
-        description: "Failed to fetch goal templates, showing sample data",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    // Filter by search
+    const filtered = allTemplates.filter(template =>
+      (template.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      template.title?.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+    const totalItems = filtered.length;
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filtered.slice(startIndex, endIndex);
+    setTemplates(paginatedData);
+    setTotalPages(Math.ceil(totalItems / itemsPerPage));
   };
 
   useEffect(() => {
@@ -120,6 +105,30 @@ const GoalTemplates = () => {
     setSearchTerm(e.target.value);
     setCurrentPage(1); // Reset to first page when searching
   };
+
+  function getPaginationRange(current, total) {
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+    let l;
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+        range.push(i);
+      }
+    }
+    for (let i of range) {
+      if (l) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l > 2) {
+          rangeWithDots.push('...');
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    }
+    return rangeWithDots;
+  }
 
   return (
     <div className="space-y-6">
@@ -256,20 +265,25 @@ const GoalTemplates = () => {
                               className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                             />
                           </PaginationItem>
-                          {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                            const page = i + 1;
-                            return (
-                              <PaginationItem key={page}>
-                                <PaginationLink
-                                  onClick={() => handlePageChange(page)}
-                                  isActive={currentPage === page}
-                                  className="cursor-pointer"
-                                >
-                                  {page}
-                                </PaginationLink>
-                              </PaginationItem>
-                            );
-                          })}
+                          {getPaginationRange(currentPage, totalPages).map((page, idx) =>
+                            page === '...'
+                              ? (
+                                <PaginationItem key={"ellipsis-" + idx}>
+                                  <span className="px-2">...</span>
+                                </PaginationItem>
+                              )
+                              : (
+                                <PaginationItem key={page}>
+                                  <PaginationLink
+                                    onClick={() => handlePageChange(page)}
+                                    isActive={currentPage === page}
+                                    className="cursor-pointer"
+                                  >
+                                    {page}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              )
+                          )}
                           <PaginationItem>
                             <PaginationNext 
                               onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
